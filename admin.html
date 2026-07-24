@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1C2E">
+<title>Admin — Jemput An Nashir Islamic School</title>
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo"><img src="logo.png" alt="Logo An Nashir Islamic School"></div>
+    <div>
+      <div class="topbar-name">Kelola Sekolah</div>
+      <div class="topbar-sub">An Nashir Islamic School (SD)</div>
+    </div>
+  </div>
+  <button class="topbar-action" id="logout-btn" style="display:none;" onclick="doLogout()">Keluar</button>
+</div>
+
+<div class="page-wrap wide">
+
+  <!-- LOGIN -->
+  <div id="login-wrap" class="login-wrap">
+    <div class="login-card">
+      <div class="lock-icon">🔒</div>
+      <div class="admin-title" style="text-align:center;">Masuk sebagai Admin</div>
+      <div class="admin-sub" style="text-align:center;">Halaman ini khusus guru/pengelola sekolah.</div>
+      <input class="text-input" id="login-email" type="email" placeholder="Email guru/admin">
+      <input class="text-input" id="login-pass" type="password" placeholder="Kata sandi" onkeydown="if(event.key==='Enter') doLogin()">
+      <div class="pin-error" id="login-error"></div>
+      <button class="sheet-btn" onclick="doLogin()">Masuk</button>
+      <button class="reset-link" onclick="doResetPassword()">Lupa kata sandi?</button>
+      <div class="login-hint">Akun dibuat oleh admin utama lewat Firebase Console — tidak ada pendaftaran mandiri.</div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div id="dashboard-wrap" style="display:none;">
+    <div class="admin-card">
+      <div class="admin-title">Tambah Siswa</div>
+      <div class="admin-sub">Data ini langsung tersinkron ke Aplikasi Orang Tua dan Layar Kelas.</div>
+      <div class="admin-form-grid">
+        <div class="admin-field">
+          <label>Nama siswa</label>
+          <input id="new-name" placeholder="cth: Zahra Aulia">
+        </div>
+        <div class="admin-field">
+          <label>Kelas</label>
+          <select id="new-class">
+            <option>SD 1</option><option>SD 2</option><option>SD 3</option>
+            <option>SD 4</option><option>SD 5</option><option>SD 6</option>
+          </select>
+        </div>
+        <div class="admin-field">
+          <label>PIN (4 digit)</label>
+          <input id="new-pin" maxlength="4" placeholder="1234">
+        </div>
+        <button class="admin-add-btn" id="add-btn" onclick="doAddStudent()">+ Tambah</button>
+      </div>
+      <div class="toast" id="add-toast"></div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-title">Daftar Siswa</div>
+      <div class="admin-sub">Klik kotak PIN untuk mengubahnya. Perubahan tersimpan otomatis.</div>
+      <div id="admin-list"><div class="admin-empty">Memuat…</div></div>
+    </div>
+
+    <div class="admin-card">
+      <div class="admin-title">Akun Saya</div>
+      <div class="admin-sub" id="account-email">—</div>
+      <button class="admin-add-btn" style="background:var(--slate);" onclick="doResetPasswordLoggedIn()">Kirim link reset kata sandi ke email ini</button>
+      <div class="toast" id="account-toast"></div>
+    </div>
+  </div>
+
+  <div class="footnote">Setiap guru/admin sebaiknya punya akun sendiri (dibuat lewat Firebase Console) agar riwayat perubahan bisa dilacak per orang.</div>
+</div>
+
+<script type="module">
+import {
+  auth, adminLogin, adminLogout, watchAdminSession, resetAdminPassword,
+  listenRoster, addStudent, updateStudentPin, deleteStudent,
+} from "./firebase-config.js";
+
+let ROSTER = [];
+let unsubRoster = null;
+
+/* ---------------- AUTH ---------------- */
+window.doLogin = async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent='';
+  if(!email || !pass){ errEl.textContent='Email dan kata sandi wajib diisi.'; return; }
+  try{
+    await adminLogin(email, pass);
+  }catch(e){
+    errEl.textContent = 'Email atau kata sandi salah.';
+  }
+}
+window.doLogout = async function doLogout(){
+  await adminLogout();
+}
+window.doResetPassword = async function doResetPassword(){
+  const email = document.getElementById('login-email').value.trim();
+  const errEl = document.getElementById('login-error');
+  if(!email){ errEl.textContent='Isi email dulu, lalu klik "Lupa kata sandi?" lagi.'; return; }
+  try{
+    await resetAdminPassword(email);
+    errEl.style.color='var(--green)';
+    errEl.textContent='Link reset kata sandi sudah dikirim ke email tersebut.';
+  }catch(e){
+    errEl.style.color='var(--coral)';
+    errEl.textContent='Gagal mengirim link reset. Periksa alamat email.';
+  }
+}
+window.doResetPasswordLoggedIn = async function doResetPasswordLoggedIn(){
+  const toast = document.getElementById('account-toast');
+  try{
+    await resetAdminPassword(auth.currentUser.email);
+    toast.className='toast ok';
+    toast.textContent='Link reset kata sandi sudah dikirim ke email Anda.';
+  }catch(e){
+    toast.className='toast err';
+    toast.textContent='Gagal mengirim, coba lagi.';
+  }
+}
+
+watchAdminSession((user)=>{
+  const loginWrap = document.getElementById('login-wrap');
+  const dashWrap = document.getElementById('dashboard-wrap');
+  const logoutBtn = document.getElementById('logout-btn');
+  if(user){
+    loginWrap.style.display='none';
+    dashWrap.style.display='block';
+    logoutBtn.style.display='inline-block';
+    document.getElementById('account-email').textContent = user.email;
+    if(!unsubRoster){
+      unsubRoster = listenRoster((list)=>{ ROSTER = list; renderAdminList(); });
+    }
+  } else {
+    loginWrap.style.display='block';
+    dashWrap.style.display='none';
+    logoutBtn.style.display='none';
+    if(unsubRoster){ unsubRoster(); unsubRoster=null; }
+  }
+});
+
+/* ---------------- STUDENT LIST ---------------- */
+function renderAdminList(){
+  const el = document.getElementById('admin-list');
+  if(ROSTER.length===0){
+    el.innerHTML = `<div class="admin-empty">Belum ada siswa terdaftar.</div>`;
+    return;
+  }
+  const classes = [...new Set(ROSTER.map(s=>s.class))].sort();
+  el.innerHTML = classes.map(cls=>{
+    const students = ROSTER.filter(s=>s.class===cls).sort((a,b)=>a.name.localeCompare(b.name));
+    return `
+      <div class="admin-class-group">
+        <div class="admin-class-heading">Kelas ${cls}</div>
+        ${students.map(s=>`
+          <div class="admin-row">
+            <div class="admin-row-name">${s.name}</div>
+            <div class="admin-row-actions">
+              <div class="pin-badge" onclick="doEditPin('${s.id}','${s.name.replace(/'/g,"\\'")}')" title="Klik untuk ubah PIN">Ubah PIN</div>
+              <button class="icon-btn" onclick="doDeleteStudent('${s.id}','${s.name.replace(/'/g,"\\'")}')" title="Hapus">✕</button>
+            </div>
+          </div>`).join('')}
+      </div>`;
+  }).join('');
+}
+
+/* ---------------- CRUD ---------------- */
+window.doAddStudent = async function doAddStudent(){
+  const name = document.getElementById('new-name').value.trim();
+  const cls = document.getElementById('new-class').value;
+  const pinVal = document.getElementById('new-pin').value.trim();
+  const toast = document.getElementById('add-toast');
+  const btn = document.getElementById('add-btn');
+  if(!name){ toast.className='toast err'; toast.textContent='Nama siswa wajib diisi.'; return; }
+  if(!/^\d{4}$/.test(pinVal)){ toast.className='toast err'; toast.textContent='PIN harus 4 digit angka.'; return; }
+  btn.disabled = true; btn.textContent='Menyimpan…';
+  try{
+    await addStudent(name, cls, pinVal);
+    document.getElementById('new-name').value='';
+    document.getElementById('new-pin').value='';
+    toast.className='toast ok';
+    toast.textContent=`${name} berhasil ditambahkan.`;
+  }catch(e){
+    toast.className='toast err';
+    toast.textContent='Gagal menambahkan siswa. Coba lagi.';
+  }
+  btn.disabled=false; btn.textContent='+ Tambah';
+}
+window.doEditPin = async function doEditPin(id, name){
+  const newPin = prompt(`PIN baru untuk ${name} (4 digit):`);
+  if(newPin===null) return;
+  if(!/^\d{4}$/.test(newPin)){ alert('PIN harus 4 digit angka.'); return; }
+  try{
+    await updateStudentPin(id, newPin);
+  }catch(e){
+    alert('Gagal mengubah PIN, coba lagi.');
+  }
+}
+window.doDeleteStudent = async function doDeleteStudent(id, name){
+  if(!confirm(`Hapus ${name} dari daftar siswa?`)) return;
+  try{
+    await deleteStudent(id);
+  }catch(e){
+    alert('Gagal menghapus siswa, coba lagi.');
+  }
+}
+</script>
+</body>
+</html>

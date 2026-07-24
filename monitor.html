@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1C2E">
+<title>Layar Kelas — An Nashir Islamic School</title>
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="board-page">
+
+<!-- LOGIN GATE (perangkat TV/monitor login sekali sebagai guru piket) -->
+<div id="login-wrap" class="login-wrap" style="padding-top:100px;">
+  <div class="login-card">
+    <div class="lock-icon">🔒</div>
+    <div class="admin-title" style="text-align:center;">Masuk Perangkat Layar Kelas</div>
+    <div class="admin-sub" style="text-align:center;">Login sekali di perangkat TV/monitor ini, lalu biarkan tetap terbuka.</div>
+    <input class="text-input" id="login-email" type="email" placeholder="Email guru/admin">
+    <input class="text-input" id="login-pass" type="password" placeholder="Kata sandi" onkeydown="if(event.key==='Enter') doLogin()">
+    <div class="pin-error" id="login-error"></div>
+    <button class="sheet-btn" onclick="doLogin()">Masuk</button>
+  </div>
+</div>
+
+<!-- BOARD -->
+<div id="board-wrap" style="display:none;">
+  <div class="topbar board-topbar">
+    <div class="topbar-brand">
+      <div class="topbar-logo" style="width:48px;height:48px;"><img src="logo.png" alt="Logo"></div>
+      <div>
+        <div class="topbar-name">Papan Penjemputan</div>
+        <div class="topbar-sub">An Nashir Islamic School (SD) · Live</div>
+      </div>
+    </div>
+    <div class="board-clock" id="clock">--:--</div>
+  </div>
+  <div class="board-content" id="board-content"></div>
+</div>
+
+<script type="module">
+import { watchAdminSession, adminLogin, listenQueue, markPickupDone } from "./firebase-config.js";
+
+let QUEUE = [];
+let unsubQueue = null;
+
+window.doLogin = async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent='';
+  if(!email || !pass){ errEl.textContent='Email dan kata sandi wajib diisi.'; return; }
+  try{
+    await adminLogin(email, pass);
+  }catch(e){
+    errEl.textContent = 'Email atau kata sandi salah.';
+  }
+}
+
+watchAdminSession((user)=>{
+  const loginWrap = document.getElementById('login-wrap');
+  const boardWrap = document.getElementById('board-wrap');
+  if(user){
+    loginWrap.style.display='none';
+    boardWrap.style.display='block';
+    if(!unsubQueue){
+      unsubQueue = listenQueue((list)=>{ QUEUE = list; renderBoard(); });
+    }
+  } else {
+    loginWrap.style.display='block';
+    boardWrap.style.display='none';
+    if(unsubQueue){ unsubQueue(); unsubQueue=null; }
+  }
+});
+
+function timeAgo(ts){
+  if(!ts) return 'baru saja';
+  const millis = ts.toMillis ? ts.toMillis() : ts;
+  const mins = Math.max(0, Math.floor((Date.now()-millis)/60000));
+  if(mins<1) return 'baru saja';
+  return `${mins} menit lalu`;
+}
+function renderBoard(){
+  const el = document.getElementById('board-content');
+  const queue = QUEUE.slice().sort((a,b)=>{
+    const ta = a.time?.toMillis ? a.time.toMillis() : 0;
+    const tb = b.time?.toMillis ? b.time.toMillis() : 0;
+    return tb-ta;
+  });
+  if(queue.length===0){
+    el.innerHTML = `<div class="board-empty"><b>Papan kosong</b>Belum ada penjemputan yang masuk.</div>`;
+    return;
+  }
+  el.innerHTML = `<div class="board-grid">
+    ${queue.map(q=>{
+      const millis = q.time?.toMillis ? q.time.toMillis() : Date.now();
+      const fresh = (Date.now()-millis) < 20000;
+      return `
+      <div class="call-card ${fresh?'fresh':''}">
+        <span class="call-class">Kelas ${q.class}</span>
+        <div class="call-name">${q.name}</div>
+        <div class="call-meta">Dijemput oleh ${q.picker} · ${timeAgo(q.time)}</div>
+        <button class="call-done-btn" onclick="doMarkDone('${q.id}')">✓ Selesai — anak sudah diserahkan</button>
+      </div>`;
+    }).join('')}
+  </div>`;
+}
+window.doMarkDone = async function doMarkDone(id){
+  try{
+    await markPickupDone(id);
+  }catch(e){
+    alert('Gagal menandai selesai, coba lagi.');
+  }
+}
+
+function tickClock(){
+  const d = new Date();
+  document.getElementById('clock').textContent = d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+}
+setInterval(tickClock, 1000); tickClock();
+setInterval(()=>{ if(document.getElementById('board-wrap').style.display!=='none') renderBoard(); }, 15000);
+</script>
+</body>
+</html>

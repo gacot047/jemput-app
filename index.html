@@ -1,0 +1,246 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1C2E">
+<title>Jemput — An Nashir Islamic School</title>
+<link rel="icon" href="logo.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="topbar">
+  <div class="topbar-brand">
+    <div class="topbar-logo"><img src="logo.png" alt="Logo An Nashir Islamic School"></div>
+    <div>
+      <div class="topbar-name">Jemput</div>
+      <div class="topbar-sub">An Nashir Islamic School (SD)</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-wrap">
+
+  <div class="geo-pill" id="geo-pill">
+    <div class="geo-dot" id="geo-dot"></div>
+    <div>
+      <div class="geo-label" id="geo-label">Mengecek lokasi…</div>
+      <div class="geo-sub" id="geo-sub">Aktifkan izin lokasi di browser Anda</div>
+    </div>
+    <button class="geo-retry" id="geo-retry" style="display:none;" onclick="checkLocation()">Coba lagi</button>
+  </div>
+
+  <div id="body-content">
+    <div class="empty-state">Memuat…</div>
+  </div>
+
+</div>
+
+<!-- PIN SHEET -->
+<div class="sheet-overlay" id="sheet-overlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div id="sheet-content"></div>
+  </div>
+</div>
+
+<script type="module">
+import { listenRoster, listenQueue, submitPickup } from "./firebase-config.js";
+
+let ROSTER = [];
+let QUEUE = [];
+let coords = null;
+let selectedStudent = null;
+let pin = '';
+let attempts = 0;
+const MAX_ATTEMPTS = 3;
+
+/* ---------------- GEOLOCATION ---------------- */
+window.checkLocation = function checkLocation(){
+  const dot = document.getElementById('geo-dot');
+  const label = document.getElementById('geo-label');
+  const sub = document.getElementById('geo-sub');
+  const retry = document.getElementById('geo-retry');
+  retry.style.display='none';
+  label.textContent = 'Mengecek lokasi…';
+  sub.textContent = 'Mohon tunggu sebentar';
+  dot.className='geo-dot';
+
+  if(!navigator.geolocation){
+    dot.className='geo-dot bad';
+    label.textContent='Perangkat tidak mendukung lokasi';
+    sub.textContent='Gunakan browser lain atau hubungi guru piket';
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      coords = pos.coords;
+      dot.className='geo-dot ok';
+      label.textContent='Lokasi terdeteksi';
+      sub.textContent='Jarak akan diverifikasi ulang saat Anda memilih siswa';
+      renderBody();
+    },
+    (err)=>{
+      dot.className='geo-dot bad';
+      label.textContent='Izin lokasi ditolak / gagal';
+      sub.textContent='Aktifkan izin lokasi lalu coba lagi';
+      retry.style.display='inline-block';
+      renderBody();
+    },
+    { enableHighAccuracy:true, timeout:10000 }
+  );
+}
+checkLocation();
+
+/* ---------------- ROSTER + QUEUE (real-time) ---------------- */
+listenRoster((list)=>{ ROSTER = list; renderBody(); });
+listenQueue((list)=>{ QUEUE = list; renderBody(); });
+
+function renderBody(){
+  const el = document.getElementById('body-content');
+  el.innerHTML = `
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="search-input" placeholder="Cari nama anak…" oninput="filterList()">
+    </div>
+    <div class="section-label">Pilih siswa yang dijemput</div>
+    <div class="student-list" id="student-list"></div>
+  `;
+  renderStudentList(ROSTER);
+  document.getElementById('search-input').oninput = filterList;
+}
+function filterList(){
+  const q = document.getElementById('search-input').value.toLowerCase();
+  renderStudentList(ROSTER.filter(s => s.name.toLowerCase().includes(q)));
+}
+function renderStudentList(list){
+  const el = document.getElementById('student-list');
+  if(!el) return;
+  if(list.length===0){
+    el.innerHTML = `<div class="empty-state">${ROSTER.length===0 ? 'Memuat daftar siswa…' : 'Tidak ditemukan.'}</div>`;
+    return;
+  }
+  el.innerHTML = list.map(s=>{
+    const called = QUEUE.find(q=>q.studentId===s.id);
+    const initials = s.name.split(' ').slice(0,2).map(w=>w[0]).join('');
+    return `
+    <div class="student-row ${called?'disabled':''}" ${called?'':`onclick="openPin('${s.id}')"`}>
+      <div class="student-left">
+        <div class="avatar">${initials}</div>
+        <div>
+          <div class="student-name">${s.name}</div>
+          <div class="student-class">Kelas ${s.class}</div>
+        </div>
+      </div>
+      ${called ? `<span class="status-tag">Sudah dipanggil</span>` : `<span class="chevron">›</span>`}
+    </div>`;
+  }).join('');
+}
+
+/* ---------------- PIN SHEET ---------------- */
+window.openPin = function openPin(id){
+  selectedStudent = ROSTER.find(s=>s.id===id);
+  pin=''; attempts=0;
+  renderPinSheet();
+  document.getElementById('sheet-overlay').classList.add('open');
+}
+window.closeSheet = function closeSheet(){
+  document.getElementById('sheet-overlay').classList.remove('open');
+}
+function renderPinSheet(errMsg){
+  const c = document.getElementById('sheet-content');
+  c.innerHTML = `
+    <div class="sheet-title">Masukkan PIN Penjemputan</div>
+    <div class="sheet-sub">Untuk menjemput <b>${selectedStudent.name}</b> · Kelas ${selectedStudent.class}</div>
+    <div class="pin-dots" id="pin-dots">
+      ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<pin.length?'filled':''}"></div>`).join('')}
+    </div>
+    <div class="pin-error">${errMsg||''}</div>
+    <div class="keypad">
+      ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="key" onclick="pressKey('${n}')">${n}</button>`).join('')}
+      <button class="key func" onclick="closeSheet()">Batal</button>
+      <button class="key" onclick="pressKey('0')">0</button>
+      <button class="key func" onclick="backspace()">⌫</button>
+    </div>
+    <div class="field-label">Nama penjemput (opsional)</div>
+    <input class="text-input" id="picker-name" placeholder="cth: Budi (Ojek Online) / Nenek">
+  `;
+}
+window.pressKey = function pressKey(n){
+  if(pin.length>=4) return;
+  pin += n;
+  renderPinSheet();
+  if(pin.length===4) checkPin();
+}
+window.backspace = function backspace(){
+  pin = pin.slice(0,-1);
+  renderPinSheet();
+}
+async function checkPin(){
+  const dotsEl = document.getElementById('pin-dots');
+  const pickerName = document.getElementById('picker-name')?.value || '';
+  const c = document.getElementById('sheet-content');
+  c.style.opacity='.5'; c.style.pointerEvents='none';
+
+  let result;
+  try{
+    result = await submitPickup(selectedStudent.id, pin, pickerName, coords);
+  }catch(e){
+    c.style.opacity='1'; c.style.pointerEvents='auto';
+    pin='';
+    renderPinSheet('Gagal menghubungi server. Periksa koneksi internet Anda.');
+    return;
+  }
+  c.style.opacity='1'; c.style.pointerEvents='auto';
+
+  if(result.ok){
+    showSuccess();
+    return;
+  }
+
+  pin='';
+  if(dotsEl) dotsEl.classList.add('shake');
+
+  const messages = {
+    wrong_pin: `PIN salah. ${result.attemptsLeft!=null ? `Percobaan tersisa: ${result.attemptsLeft}.` : ''}`,
+    locked: null, // shown as lockout box below
+    out_of_range: null,
+    already_queued: 'Siswa ini sudah masuk antrean penjemputan.',
+  };
+
+  if(result.reason==='locked'){
+    c.innerHTML = `
+      <div class="sheet-title">Verifikasi terkunci</div>
+      <div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${selectedStudent.name}.</div>
+      <div class="lockout-box">🔒 Demi keamanan, akun ini dikunci sementara. Silakan hubungi <b>guru piket di gerbang</b> untuk verifikasi manual.</div>
+      <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
+    `;
+  } else if(result.reason==='out_of_range'){
+    c.innerHTML = `
+      <div class="sheet-title">Diluar radius sekolah</div>
+      <div class="sheet-sub">Lokasi Anda saat ini terlalu jauh dari gerbang sekolah.</div>
+      <div class="warn-box">📍 Mendekatlah ke area sekolah, lalu coba lagi.</div>
+      <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
+    `;
+  } else {
+    renderPinSheet(messages[result.reason] || 'Terjadi kesalahan, coba lagi.');
+  }
+}
+function showSuccess(){
+  const c = document.getElementById('sheet-content');
+  c.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon">✓</div>
+      <div class="success-title">Terkirim ke Layar Kelas</div>
+      <div class="success-sub">Guru akan mengumumkan nama anak Anda. Silakan tunggu di luar atau di mobil.</div>
+      <div class="success-name">Menjemput <b>${selectedStudent.name}</b><br><span style="font-size:12px;color:var(--slate);">Kelas ${selectedStudent.class}</span></div>
+      <button class="sheet-btn" onclick="closeSheet()">Selesai</button>
+    </div>
+  `;
+}
+</script>
+</body>
+</html>
