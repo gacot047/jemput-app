@@ -55,6 +55,7 @@ let QUEUE = [];
 let coords = null;
 let selectedStudent = null;
 let pin = '';
+let pickerName = '';
 let attempts = 0;
 const MAX_ATTEMPTS = 3;
 
@@ -143,33 +144,47 @@ function renderStudentList(list){
 /* ---------------- PIN SHEET ---------------- */
 window.openPin = function openPin(id){
   selectedStudent = ROSTER.find(s=>s.id===id);
-  pin=''; attempts=0;
+  pin=''; attempts=0; pickerName='';
   renderPinSheet();
   document.getElementById('sheet-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
 }
 window.closeSheet = function closeSheet(){
   document.getElementById('sheet-overlay').classList.remove('open');
 }
-function renderPinSheet(errMsg){
+window.updatePickerName = function updatePickerName(v){
+  pickerName = v;
+}
+function renderPinSheet(pinErr, nameErr){
   const c = document.getElementById('sheet-content');
+  const safeName = pickerName.replace(/"/g,'&quot;');
   c.innerHTML = `
-    <div class="sheet-title">Masukkan PIN Penjemputan</div>
+    <div class="sheet-title">Verifikasi Penjemputan</div>
     <div class="sheet-sub">Untuk menjemput <b>${selectedStudent.name}</b> · Kelas ${selectedStudent.class}</div>
+
+    <div class="field-label" style="margin-top:2px;">Nama penjemput <span style="color:var(--coral);">*wajib diisi</span></div>
+    <input class="text-input" id="picker-name" value="${safeName}" oninput="updatePickerName(this.value)" placeholder="cth: Budi (Ojek Online) / Nenek">
+    <div class="pin-error">${nameErr||''}</div>
+
+    <div class="field-label" style="margin-top:10px; text-align:center;">Masukkan PIN Penjemputan</div>
     <div class="pin-dots" id="pin-dots">
       ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<pin.length?'filled':''}"></div>`).join('')}
     </div>
-    <div class="pin-error">${errMsg||''}</div>
+    <div class="pin-error">${pinErr||''}</div>
     <div class="keypad">
       ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="key" onclick="pressKey('${n}')">${n}</button>`).join('')}
       <button class="key func" onclick="closeSheet()">Batal</button>
       <button class="key" onclick="pressKey('0')">0</button>
       <button class="key func" onclick="backspace()">⌫</button>
     </div>
-    <div class="field-label">Nama penjemput (opsional)</div>
-    <input class="text-input" id="picker-name" placeholder="cth: Budi (Ojek Online) / Nenek">
   `;
 }
 window.pressKey = function pressKey(n){
+  if(!pickerName.trim()){
+    renderPinSheet('', 'Isi nama penjemput dulu sebelum memasukkan PIN.');
+    document.getElementById('picker-name')?.focus();
+    return;
+  }
   if(pin.length>=4) return;
   pin += n;
   renderPinSheet();
@@ -180,14 +195,19 @@ window.backspace = function backspace(){
   renderPinSheet();
 }
 async function checkPin(){
+  if(!pickerName.trim()){
+    pin='';
+    renderPinSheet('', 'Isi nama penjemput dulu sebelum memasukkan PIN.');
+    document.getElementById('picker-name')?.focus();
+    return;
+  }
   const dotsEl = document.getElementById('pin-dots');
-  const pickerName = document.getElementById('picker-name')?.value || '';
   const c = document.getElementById('sheet-content');
   c.style.opacity='.5'; c.style.pointerEvents='none';
 
   let result;
   try{
-    result = await submitPickup(selectedStudent.id, pin, pickerName, coords);
+    result = await submitPickup(selectedStudent.id, pin, pickerName.trim(), coords);
   }catch(e){
     c.style.opacity='1'; c.style.pointerEvents='auto';
     pin='';
