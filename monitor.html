@@ -99,8 +99,7 @@ function renderBoard(){
       const fresh = (Date.now()-millis) < 20000;
       return `
       <div class="call-card ${fresh?'fresh':''}">
-        <span class="call-class">Kelas ${q.class}</span>
-        <div class="call-name">${q.name}</div>
+        <div class="call-name">${q.name} <span class="from-tag">from ${q.class}</span></div>
         <div class="call-meta">Dijemput oleh ${q.picker} · ${timeAgo(q.time)}</div>
         <button class="call-done-btn" onclick="doMarkDone('${q.id}')">✓ Selesai — anak sudah diserahkan</button>
       </div>`;
