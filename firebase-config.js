@@ -53,7 +53,7 @@ const requestPickupFn = httpsCallable(functions, "requestPickup");
 export async function submitPickup(studentId, pin, pickerName, coords) {
   const res = await requestPickupFn({
     studentId, pin, pickerName,
-    lat: coords?.latitude, lng: coords?.longitude,
+    lat: coords?.latitude, lng: coords?.longitude, accuracy: coords?.accuracy,
   });
   return res.data; // { ok, reason?, attemptsLeft? }
 }

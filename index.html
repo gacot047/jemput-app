@@ -67,7 +67,7 @@ window.checkLocation = function checkLocation(){
   const retry = document.getElementById('geo-retry');
   retry.style.display='none';
   label.textContent = 'Mengecek lokasi…';
-  sub.textContent = 'Mohon tunggu sebentar';
+  sub.textContent = 'Mohon tunggu sebentar (menyempurnakan akurasi GPS)';
   dot.className='geo-dot';
 
   if(!navigator.geolocation){
@@ -76,23 +76,49 @@ window.checkLocation = function checkLocation(){
     sub.textContent='Gunakan browser lain atau hubungi guru piket';
     return;
   }
-  navigator.geolocation.getCurrentPosition(
-    (pos)=>{
-      coords = pos.coords;
+
+  // GPS di HP butuh beberapa detik untuk menyempurnakan akurasinya.
+  // Alih-alih memakai bacaan pertama (yang sering meleset jauh), kita
+  // dengarkan beberapa bacaan selama beberapa detik dan pakai yang
+  // paling akurat (nilai `accuracy` paling kecil).
+  let best = null;
+  let watchId = null;
+  let finished = false;
+
+  function finish(){
+    if(finished) return;
+    finished = true;
+    if(watchId !== null) navigator.geolocation.clearWatch(watchId);
+    if(best){
+      coords = best;
       dot.className='geo-dot ok';
       label.textContent='Lokasi terdeteksi';
-      sub.textContent='Jarak akan diverifikasi ulang saat Anda memilih siswa';
-      renderBody();
-    },
-    (err)=>{
+      sub.textContent = `Akurasi ±${Math.round(best.accuracy)}m — jarak diverifikasi ulang saat memilih siswa`;
+    } else {
       dot.className='geo-dot bad';
-      label.textContent='Izin lokasi ditolak / gagal';
+      label.textContent='Lokasi belum ditemukan';
       sub.textContent='Aktifkan izin lokasi lalu coba lagi';
       retry.style.display='inline-block';
-      renderBody();
+    }
+    renderBody();
+  }
+
+  watchId = navigator.geolocation.watchPosition(
+    (pos)=>{
+      if(!best || pos.coords.accuracy < best.accuracy){
+        best = pos.coords;
+      }
+      if(pos.coords.accuracy <= 30){
+        finish(); // sudah cukup akurat, tidak perlu menunggu lebih lama
+      }
     },
-    { enableHighAccuracy:true, timeout:10000 }
+    (err)=>{
+      if(!best) finish();
+    },
+    { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
   );
+
+  setTimeout(finish, 6000); // batas atas menunggu, pakai bacaan terbaik yang ada
 }
 checkLocation();
 
