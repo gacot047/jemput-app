@@ -58,6 +58,16 @@ export async function submitPickup(studentId, pin, pickerName, coords) {
   return res.data; // { ok, reason?, attemptsLeft? }
 }
 
+/* ---------- orang tua: ganti PIN keluarga sendiri (butuh PIN lama) ---------- */
+const changeFamilyPinFn = httpsCallable(functions, "changeFamilyPin");
+export async function changeFamilyPin(studentId, currentPin, newPin, coords) {
+  const res = await changeFamilyPinFn({
+    studentId, currentPin, newPin,
+    lat: coords?.latitude, lng: coords?.longitude, accuracy: coords?.accuracy,
+  });
+  return res.data; // { ok, reason?, attemptsLeft? }
+}
+
 /* ---------- admin: login & sesi ---------- */
 export function adminLogin(email, password) {
   return signInWithEmailAndPassword(auth, email, password);

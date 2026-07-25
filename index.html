@@ -48,7 +48,7 @@
 </div>
 
 <script type="module">
-import { listenRoster, listenQueue, submitPickup } from "./firebase-config.js";
+import { listenRoster, listenQueue, submitPickup, changeFamilyPin } from "./firebase-config.js";
 
 let ROSTER = [];
 let QUEUE = [];
@@ -58,6 +58,11 @@ let pin = '';
 let pickerName = '';
 let attempts = 0;
 const MAX_ATTEMPTS = 3;
+let mode = 'jemput'; // 'jemput' | 'gantipin'
+let cpStudent = null;
+let cpStage = 'current'; // 'current' | 'new' | 'confirm'
+let cpPin = '';
+let cpVals = { current: '', new: '', confirm: '' };
 
 /* ---------------- GEOLOCATION ---------------- */
 window.checkLocation = function checkLocation(){
@@ -133,11 +138,24 @@ function renderBody(){
       <span class="search-icon">🔍</span>
       <input class="search-input" id="search-input" placeholder="Cari nama anak…" oninput="filterList()">
     </div>
-    <div class="section-label">Pilih siswa yang dijemput</div>
+    ${mode === 'gantipin' ? `
+      <div class="mode-banner">
+        <span>🔑 Mode Ganti PIN aktif — pilih nama anak untuk mengganti PIN keluarganya</span>
+        <button class="mode-banner-cancel" onclick="toggleChangePinMode()">Batal</button>
+      </div>
+    ` : ''}
+    <div class="section-label-row">
+      <div class="section-label">${mode === 'gantipin' ? 'Pilih siswa untuk ganti PIN' : 'Pilih siswa yang dijemput'}</div>
+      ${mode === 'jemput' ? `<button class="link-btn" onclick="toggleChangePinMode()">🔑 Lupa / ganti PIN</button>` : ''}
+    </div>
     <div class="student-list" id="student-list"></div>
   `;
   renderStudentList(ROSTER);
   document.getElementById('search-input').oninput = filterList;
+}
+window.toggleChangePinMode = function toggleChangePinMode(){
+  mode = mode === 'jemput' ? 'gantipin' : 'jemput';
+  renderBody();
 }
 function filterList(){
   const q = document.getElementById('search-input').value.toLowerCase();
@@ -151,10 +169,11 @@ function renderStudentList(list){
     return;
   }
   el.innerHTML = list.map(s=>{
-    const called = QUEUE.find(q=>q.studentId===s.id);
+    const called = mode === 'jemput' && QUEUE.find(q=>q.studentId===s.id);
     const initials = s.name.split(' ').slice(0,2).map(w=>w[0]).join('');
+    const handler = mode === 'jemput' ? `openPin('${s.id}')` : `openChangePin('${s.id}')`;
     return `
-    <div class="student-row ${called?'disabled':''}" ${called?'':`onclick="openPin('${s.id}')"`}>
+    <div class="student-row ${called?'disabled':''}" ${called?'':`onclick="${handler}"`}>
       <div class="student-left">
         <div class="avatar">${initials}</div>
         <div>
@@ -162,7 +181,7 @@ function renderStudentList(list){
           <div class="student-class">Kelas ${s.class}</div>
         </div>
       </div>
-      ${called ? `<span class="status-tag">Sudah dipanggil</span>` : `<span class="chevron">›</span>`}
+      ${called ? `<span class="status-tag">Sudah dipanggil</span>` : `<span class="chevron">${mode==='gantipin' ? '🔑' : '›'}</span>`}
     </div>`;
   }).join('');
 }
@@ -286,6 +305,114 @@ function showSuccess(){
       <button class="sheet-btn" onclick="closeSheet()">Selesai</button>
     </div>
   `;
+}
+
+/* ---------------- GANTI PIN (3 tahap: PIN lama → PIN baru → konfirmasi) ---------------- */
+window.openChangePin = function openChangePin(id){
+  cpStudent = ROSTER.find(s=>s.id===id);
+  cpStage = 'current'; cpPin = ''; cpVals = { current:'', new:'', confirm:'' };
+  renderChangePinSheet();
+  document.getElementById('sheet-overlay').classList.add('open');
+}
+const CP_LABELS = {
+  current: { title: 'Verifikasi PIN Lama', sub: (n)=>`Masukkan PIN keluarga yang berlaku saat ini untuk ${n}` },
+  new:     { title: 'Buat PIN Baru',       sub: ()=>'Masukkan PIN baru (4 digit)' },
+  confirm: { title: 'Konfirmasi PIN Baru', sub: ()=>'Ulangi sekali lagi PIN baru untuk konfirmasi' },
+};
+function renderChangePinSheet(err){
+  const c = document.getElementById('sheet-content');
+  const { title, sub } = CP_LABELS[cpStage];
+  c.innerHTML = `
+    <div class="sheet-title">${title}</div>
+    <div class="sheet-sub">${sub(cpStudent.name)} · Kelas ${cpStudent.class}</div>
+    <div class="pin-dots" id="pin-dots">
+      ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<cpPin.length?'filled':''}"></div>`).join('')}
+    </div>
+    <div class="pin-error">${err||''}</div>
+    <div class="keypad">
+      ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="key" onclick="cpPressKey('${n}')">${n}</button>`).join('')}
+      <button class="key func" onclick="closeSheet()">Batal</button>
+      <button class="key" onclick="cpPressKey('0')">0</button>
+      <button class="key func" onclick="cpBackspace()">⌫</button>
+    </div>
+  `;
+}
+window.cpPressKey = function cpPressKey(n){
+  if(cpPin.length>=4) return;
+  cpPin += n;
+  renderChangePinSheet();
+  if(cpPin.length===4) cpAdvance();
+}
+window.cpBackspace = function cpBackspace(){
+  cpPin = cpPin.slice(0,-1);
+  renderChangePinSheet();
+}
+async function cpAdvance(){
+  if(cpStage === 'current'){
+    cpVals.current = cpPin; cpPin = ''; cpStage = 'new';
+    renderChangePinSheet();
+    return;
+  }
+  if(cpStage === 'new'){
+    cpVals.new = cpPin; cpPin = ''; cpStage = 'confirm';
+    renderChangePinSheet();
+    return;
+  }
+  // stage === 'confirm'
+  cpVals.confirm = cpPin;
+  if(cpVals.new !== cpVals.confirm){
+    cpPin = ''; cpStage = 'new';
+    renderChangePinSheet('PIN baru tidak cocok dengan konfirmasi. Coba lagi dari PIN baru.');
+    return;
+  }
+
+  const dotsEl = document.getElementById('pin-dots');
+  const c = document.getElementById('sheet-content');
+  c.style.opacity='.5'; c.style.pointerEvents='none';
+  let result;
+  try{
+    result = await changeFamilyPin(cpStudent.id, cpVals.current, cpVals.new, coords);
+  }catch(e){
+    c.style.opacity='1'; c.style.pointerEvents='auto';
+    cpPin=''; cpStage='current'; cpVals={current:'',new:'',confirm:''};
+    renderChangePinSheet('Gagal menghubungi server. Periksa koneksi internet Anda.');
+    return;
+  }
+  c.style.opacity='1'; c.style.pointerEvents='auto';
+
+  if(result.ok){
+    c.innerHTML = `
+      <div class="success-wrap">
+        <div class="success-icon">✓</div>
+        <div class="success-title">PIN Berhasil Diganti</div>
+        <div class="success-sub">PIN keluarga untuk ${cpStudent.name} sudah diperbarui. PIN lama tidak berlaku lagi mulai sekarang.</div>
+        <button class="sheet-btn" onclick="closeSheet(); mode='jemput'; renderBody();">Selesai</button>
+      </div>
+    `;
+    return;
+  }
+
+  cpPin=''; cpVals={current:'',new:'',confirm:''};
+  if(dotsEl) dotsEl.classList.add('shake');
+
+  if(result.reason === 'locked'){
+    c.innerHTML = `
+      <div class="sheet-title">Verifikasi terkunci</div>
+      <div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${cpStudent.name}.</div>
+      <div class="lockout-box">🔒 Demi keamanan, akun ini dikunci sementara. Silakan hubungi <b>guru piket di gerbang</b> untuk verifikasi manual.</div>
+      <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
+    `;
+  } else if(result.reason === 'out_of_range'){
+    c.innerHTML = `
+      <div class="sheet-title">Diluar radius sekolah</div>
+      <div class="sheet-sub">Anda harus berada di area sekolah untuk mengganti PIN.</div>
+      <div class="warn-box">📍 Mendekatlah ke area sekolah, lalu coba lagi.</div>
+      <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
+    `;
+  } else {
+    cpStage = 'current';
+    renderChangePinSheet(`PIN lama salah. ${result.attemptsLeft!=null ? `Percobaan tersisa: ${result.attemptsLeft}.` : ''}`);
+  }
 }
 </script>
 </body>
