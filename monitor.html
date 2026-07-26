@@ -2,74 +2,69 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Papan Penjemputan — An Nashir Islamic School</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#0F1C2E">
+<title>Layar Kelas — An Nashir Islamic School</title>
 <link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
 
 <style>
-  * {
-    box-sizing: border-box;
-    margin: 0;
-    padding: 0;
-  }
-  body {
+  body.board-page {
     background-color: #0F1C2E;
     color: #F8FAFC;
     font-family: 'Plus Jakarta Sans', sans-serif;
     min-height: 100vh;
-    padding: 24px;
-    overflow-x: hidden;
+    margin: 0;
   }
 
-  /* Header Monitor */
-  .monitor-header {
+  /* Login Card */
+  .login-card {
+    max-width: 400px;
+    margin: 0 auto;
+    background: #1E293B;
+    border: 1px solid #334155;
+    padding: 32px;
+    border-radius: 24px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+  }
+
+  .lock-icon {
+    font-size: 40px;
+    text-align: center;
+    margin-bottom: 12px;
+  }
+
+  /* Topbar */
+  .board-topbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-bottom: 20px;
+    padding: 16px 24px;
+    background: #0F1C2E;
     border-bottom: 2px solid #1E293B;
-    margin-bottom: 24px;
   }
-  .brand-box {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-  }
-  .brand-logo {
-    width: 56px;
-    height: 56px;
-    object-fit: contain;
-  }
-  .brand-title {
-    font-size: 28px;
-    font-weight: 800;
-    letter-spacing: -0.5px;
-  }
-  .brand-sub {
-    font-size: 14px;
-    color: #38BDF8;
-    font-weight: 700;
-    letter-spacing: 1px;
-  }
-  .clock-box {
-    font-size: 36px;
+
+  .board-clock {
+    font-size: 32px;
     font-weight: 800;
     color: #F59E0B;
     font-variant-numeric: tabular-nums;
   }
 
-  /* Grid Layout Monitor */
-  .queue-grid {
+  .board-content {
+    padding: 24px;
+  }
+
+  .board-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
     gap: 20px;
   }
 
-  /* Kartu Antrean Biasa (Waiting) */
-  .monitor-card {
+  /* Call Cards */
+  .call-card {
     background: #1E293B;
     border: 2px solid #334155;
     border-radius: 16px;
@@ -77,14 +72,13 @@
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 160px;
+    min-height: 180px;
     transition: all 0.3s ease;
     position: relative;
-    overflow: hidden;
   }
 
-  /* Highlight Kartu Panggilan (CALLED) - Super Mencolok */
-  .monitor-card.called {
+  /* Status Called / Dipanggil (Paling Kiri / Paling Atas) */
+  .call-card.called {
     background: linear-gradient(135deg, #065F46 0%, #047857 100%);
     border: 3px solid #34D399;
     box-shadow: 0 0 25px rgba(52, 211, 153, 0.4);
@@ -92,198 +86,281 @@
   }
 
   @keyframes pulseGlow {
-    0% {
-      transform: scale(1);
-      box-shadow: 0 0 15px rgba(52, 211, 153, 0.3);
-    }
-    100% {
-      transform: scale(1.02);
-      box-shadow: 0 0 35px rgba(52, 211, 153, 0.7);
-    }
+    0% { transform: scale(1); box-shadow: 0 0 15px rgba(52, 211, 153, 0.3); }
+    100% { transform: scale(1.02); box-shadow: 0 0 35px rgba(52, 211, 153, 0.6); }
   }
 
-  .card-top {
+  .call-card-top {
     display: flex;
     justify-content: space-between;
     align-items: flex-start;
     margin-bottom: 12px;
   }
 
-  .status-badge {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.5px;
-    text-transform: uppercase;
-  }
-  .monitor-card .status-badge {
-    background: #334155;
-    color: #94A3B8;
-  }
-  .monitor-card.called .status-badge {
-    background: #022C22;
-    color: #6EE7B7;
-    border: 1px solid #059669;
-  }
-
   .class-badge {
     background: #0F1C2E;
     color: #38BDF8;
-    padding: 6px 14px;
-    border-radius: 12px;
-    font-size: 14px;
+    padding: 4px 12px;
+    border-radius: 10px;
+    font-size: 13px;
     font-weight: 800;
-    border: 1px solid #1E293B;
+    border: 1px solid #334155;
   }
-  .monitor-card.called .class-badge {
+
+  .call-card.called .class-badge {
     background: #022C22;
     color: #34D399;
     border-color: #059669;
   }
 
-  .student-name {
-    font-size: 24px;
+  .called-tag {
+    background: #022C22;
+    color: #6EE7B7;
+    border: 1px solid #059669;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
     font-weight: 800;
-    line-height: 1.2;
-    color: #FFFFFF;
-    margin-bottom: 8px;
-  }
-  .monitor-card.called .student-name {
-    font-size: 28px;
-    color: #FFFFFF;
-    text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    text-transform: uppercase;
   }
 
-  .picker-info {
+  .waiting-tag {
+    background: #334155;
+    color: #94A3B8;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+  }
+
+  .call-name {
+    font-size: 24px;
+    font-weight: 800;
+    color: #FFFFFF;
+    line-height: 1.2;
+    margin-bottom: 6px;
+  }
+
+  .call-meta {
     font-size: 14px;
     color: #94A3B8;
     font-weight: 600;
+    margin-bottom: 16px;
   }
-  .monitor-card.called .picker-info {
+
+  .call-card.called .call-meta {
     color: #A7F3D0;
   }
 
-  /* Empty State */
-  .empty-monitor {
-    grid-column: 1 / -1;
+  /* Buttons */
+  .call-done-btn {
+    width: 100%;
+    padding: 12px;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+  }
+
+  .call-out-btn {
+    background: #2563EB;
+    color: #FFFFFF;
+  }
+  .call-out-btn:active {
+    transform: scale(0.97);
+    background: #1D4ED8;
+  }
+
+  .done-btn {
+    background: #059669;
+    color: #FFFFFF;
+  }
+  .done-btn:active {
+    transform: scale(0.97);
+    background: #047857;
+  }
+
+  .board-empty {
     text-align: center;
     padding: 80px 20px;
     background: #1E293B;
     border-radius: 20px;
     border: 2px dashed #334155;
-  }
-  .empty-icon {
-    font-size: 56px;
-    margin-bottom: 16px;
-  }
-  .empty-title {
-    font-size: 22px;
-    font-weight: 700;
     color: #94A3B8;
+    font-size: 18px;
+  }
+  .board-empty b {
+    display: block;
+    font-size: 24px;
+    color: #F8FAFC;
+    margin-bottom: 8px;
   }
 </style>
 </head>
-<body>
+<body class="board-page">
 
-<div class="monitor-header">
-  <div class="brand-box">
-    <img src="logo.png" alt="Logo" class="brand-logo">
-    <div>
-      <div class="brand-title">Papan Penjemputan</div>
-      <div class="brand-sub">AN NASHIR ISLAMIC SCHOOL (SD) · LIVE</div>
-    </div>
+<!-- LOGIN GATE -->
+<div id="login-wrap" class="login-wrap" style="padding-top:100px;">
+  <div class="login-card">
+    <div class="lock-icon">🔒</div>
+    <div class="admin-title" style="text-align:center;">Masuk Perangkat Layar Kelas</div>
+    <div class="admin-sub" style="text-align:center; margin-bottom: 20px;">Login sekali di perangkat TV/monitor ini, lalu biarkan tetap terbuka.</div>
+    <input class="text-input" id="login-email" type="email" placeholder="Email guru/admin" style="margin-bottom:12px;">
+    <input class="text-input" id="login-pass" type="password" placeholder="Kata sandi" onkeydown="if(event.key==='Enter') doLogin()" style="margin-bottom:12px;">
+    <div class="pin-error" id="login-error" style="margin-bottom:12px; color:#EF4444; text-align:center;"></div>
+    <button class="sheet-btn" onclick="doLogin()">Masuk</button>
   </div>
-  <div class="clock-box" id="clock">00:00</div>
 </div>
 
-<div class="queue-grid" id="queue-grid">
-  <div class="empty-monitor">
-    <div class="empty-icon">☕</div>
-    <div class="empty-title">Belum ada antrean penjemputan saat ini</div>
+<!-- BOARD -->
+<div id="board-wrap" style="display:none;">
+  <div class="topbar board-topbar">
+    <div class="topbar-brand">
+      <div class="topbar-logo" style="width:48px;height:48px;"><img src="logo.png" alt="Logo"></div>
+      <div>
+        <div class="topbar-name">Papan Penjemputan</div>
+        <div class="topbar-sub">An Nashir Islamic School (SD) · Live</div>
+      </div>
+    </div>
+    <div class="board-clock" id="clock">--:--</div>
   </div>
+  <div class="board-content" id="board-content"></div>
 </div>
 
 <script type="module">
-  import { listenQueue } from "./firebase-config.js";
+import { watchAdminSession, adminLogin, listenQueue, markCalled, markPickupDone } from "./firebase-config.js";
 
-  // Clock Update
-  function updateClock() {
-    const now = new Date();
-    const hours = String(now.getHours()).padStart(2, '0');
-    const minutes = String(now.getMinutes()).padStart(2, '0');
-    document.getElementById('clock').textContent = `${hours}:${minutes}`;
+let QUEUE = [];
+let unsubQueue = null;
+
+window.doLogin = async function doLogin(){
+  const email = document.getElementById('login-email').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  errEl.textContent='';
+  if(!email || !pass){ errEl.textContent='Email dan kata sandi wajib diisi.'; return; }
+  try{
+    await adminLogin(email, pass);
+  }catch(e){
+    errEl.textContent = 'Email atau kata sandi salah.';
   }
-  setInterval(updateClock, 1000);
-  updateClock();
+}
 
-  // Real-time Listener Queue
-  listenQueue((list) => {
-    // 1. Filter HANYA dokumen yang aktif ('waiting' dan 'called')
-    const activeQueue = list.filter(q => q.status === 'waiting' || q.status === 'called');
+watchAdminSession((user)=>{
+  const loginWrap = document.getElementById('login-wrap');
+  const boardWrap = document.getElementById('board-wrap');
+  if(user){
+    loginWrap.style.display='none';
+    boardWrap.style.display='block';
+    if(!unsubQueue){
+      unsubQueue = listenQueue((list)=>{ QUEUE = list; renderBoard(); });
+    }
+  } else {
+    loginWrap.style.display='block';
+    boardWrap.style.display='none';
+    if(unsubQueue){ unsubQueue(); unsubQueue=null; }
+  }
+});
 
-    // Helper untuk mengambil timestamp/milisekon terakurat
-    const getTime = (item) => {
-      // Prioritaskan calledAt (waktu dipanggil), jika tidak ada pakai time (waktu daftar)
-      const t = item.calledAt || item.time;
-      if (!t) return 0;
-      return t.toMillis ? t.toMillis() : (t.seconds ? t.seconds * 1000 : new Date(t).getTime());
-    };
+function timeAgo(ts){
+  if(!ts) return 'baru saja';
+  const millis = ts.toMillis ? ts.toMillis() : (ts.seconds ? ts.seconds * 1000 : new Date(ts).getTime());
+  const mins = Math.max(0, Math.floor((Date.now()-millis)/60000));
+  if(mins<1) return 'baru saja';
+  return `${mins} menit lalu`;
+}
 
-    // 2. SORTING KETAT:
-    // - Status 'called' HARUS ada di depan 'waiting'
-    // - Jika sesama 'called' atau sesama 'waiting': YANG TERBARU (timestamp lebih besar) TAMPIL LEBIH DULU (paling kiri)
-    activeQueue.sort((a, b) => {
-      const isACalled = a.status === 'called';
-      const isBCalled = b.status === 'called';
+function getTimestamp(q){
+  // Prioritas timestamp: waktu dipanggil (calledAt) -> waktu datang (time) -> 0
+  const t = q.calledAt || q.time;
+  if(!t) return 0;
+  return t.toMillis ? t.toMillis() : (t.seconds ? t.seconds * 1000 : new Date(t).getTime());
+}
 
-      if (isACalled && !isBCalled) return -1; // a ke paling depan (kiri)
-      if (!isACalled && isBCalled) return 1;  // b ke paling depan (kiri)
+function renderBoard(){
+  const el = document.getElementById('board-content');
+  
+  // 1. Ambil HANYA status 'waiting' dan 'called' (Abaikan 'done' / 'completed')
+  const activeQueue = QUEUE.filter(q => q.status === 'waiting' || q.status === 'called');
 
-      // Jika statusnya sama, urutkan dari yang terbaru (Descending)
-      return getTime(b) - getTime(a);
-    });
+  // 2. LOGIKA SORTING KETAT & TERPERINCI
+  activeQueue.sort((a, b) => {
+    const isACalled = a.status === 'called';
+    const isBCalled = b.status === 'called';
 
-    renderQueue(activeQueue);
+    // Aturan 1: 'called' SELALU di sebelah kiri/atas daripada 'waiting'
+    if (isACalled && !isBCalled) return -1;
+    if (!isACalled && isBCalled) return 1;
+
+    // Aturan 2: Jika sama-sama 'called', yang dipanggil TERBARU ada di PALING KIRI (teratas)
+    // Aturan 3: Jika sama-sama 'waiting', yang datang TERBARU ada di KIRI
+    const timeA = getTimestamp(a);
+    const timeB = getTimestamp(b);
+    return timeB - timeA; // Descending (Terbaru = Nilai terbesar = Paling Kiri)
   });
 
-  function renderQueue(items) {
-    const grid = document.getElementById('queue-grid');
+  if(activeQueue.length === 0){
+    el.innerHTML = `<div class="board-empty"><b>Papan Kosong</b>Belum ada penjemputan yang aktif saat ini.</div>`;
+    return;
+  }
 
-    if (items.length === 0) {
-      grid.innerHTML = `
-        <div class="empty-monitor">
-          <div class="empty-icon">☕</div>
-          <div class="empty-title">Belum ada antrean penjemputan saat ini</div>
-        </div>
-      `;
-      return;
-    }
-
-    grid.innerHTML = items.map(item => {
-      const isCalled = item.status === 'called';
-      const statusLabel = isCalled ? '🔔 SILAKAN KELUAR' : '⏳ MENUNGGU';
+  el.innerHTML = `<div class="board-grid">
+    ${activeQueue.map(q => {
+      const called = q.status === 'called';
+      const cardClass = called ? 'called' : '';
+      const actionBtn = called
+        ? `<button class="call-done-btn done-btn" onclick="doMarkDone('${q.id}')">✓ Selesai — Anak Diserahkan</button>`
+        : `<button class="call-done-btn call-out-btn" onclick="doMarkCalled('${q.id}')">📢 Panggil Keluar</button>`;
+      
+      const statusBadge = called 
+        ? `<span class="called-tag">🔔 DIPANGGIL</span>` 
+        : `<span class="waiting-tag">⏳ MENUNGGU</span>`;
       
       return `
-        <div class="monitor-card ${isCalled ? 'called' : ''}">
-          <div>
-            <div class="card-top">
-              <span class="status-badge">${statusLabel}</span>
-              <span class="class-badge">Kelas ${item.class}</span>
-            </div>
-            <div class="student-name">${item.name}</div>
+      <div class="call-card ${cardClass}">
+        <div>
+          <div class="call-card-top">
+            ${statusBadge}
+            <span class="class-badge">Kelas ${q.class}</span>
           </div>
-          <div class="picker-info">
-            Penjemput: <b>${item.picker || '—'}</b>
-          </div>
+          <div class="call-name">${q.name}</div>
+          <div class="call-meta">Penjemput: <b>${q.picker || '—'}</b> · ${timeAgo(q.time)}</div>
         </div>
-      `;
-    }).join('');
-  }
-</script>
+        ${actionBtn}
+      </div>`;
+    }).join('')}
+  </div>`;
+}
 
+window.doMarkCalled = async function doMarkCalled(id){
+  try{
+    await markCalled(id);
+  }catch(e){
+    alert('Gagal menandai dipanggil, coba lagi.');
+  }
+}
+
+window.doMarkDone = async function doMarkDone(id){
+  try{
+    await markPickupDone(id);
+  }catch(e){
+    alert('Gagal menandai selesai, coba lagi.');
+  }
+}
+
+function tickClock(){
+  const d = new Date();
+  document.getElementById('clock').textContent = d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+}
+setInterval(tickClock, 1000); tickClock();
+setInterval(()=>{ if(document.getElementById('board-wrap').style.display!=='none') renderBoard(); }, 10000);
+</script>
 </body>
 </html>
