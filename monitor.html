@@ -44,11 +44,25 @@
     border-bottom: 2px solid #1E293B;
   }
 
+  /* WRAPPER JAM & TANGGAL */
+  .clock-wrapper {
+    text-align: right;
+  }
+
+  .board-date {
+    font-size: 14px;
+    font-weight: 700;
+    color: #94A3B8;
+    text-transform: capitalize;
+    margin-bottom: 2px;
+  }
+
   .board-clock {
     font-size: 32px;
     font-weight: 800;
     color: #F59E0B;
     font-variant-numeric: tabular-nums;
+    line-height: 1.1;
   }
 
   .board-content {
@@ -81,7 +95,7 @@
     box-shadow: 0 0 25px rgba(52, 211, 153, 0.4);
   }
 
-  /* KARTU MENUNGGU (Biru/Biasa - Berada Paling Depan/Kiri) */
+  /* KARTU MENUNGGU (Biru) */
   .call-card.waiting {
     background: #1E293B;
     border: 2px solid #2563EB;
@@ -221,8 +235,14 @@
         <div class="topbar-sub">An Nashir Islamic School (SD) · Live</div>
       </div>
     </div>
-    <div class="board-clock" id="clock">--:--</div>
+    
+    <!-- 🎯 BAGIAN HEADER DIUBAH DI SINI -->
+    <div class="clock-wrapper">
+      <div class="board-date" id="date-display">Senin, 27 Juli 2026</div>
+      <div class="board-clock" id="clock">--:--</div>
+    </div>
   </div>
+  
   <div class="board-content" id="board-content"></div>
 </div>
 
@@ -280,20 +300,15 @@ function timeAgo(item){
 function renderBoard(){
   const el = document.getElementById('board-content');
   
-  // Ambil status 'waiting' dan 'called'
   const activeQueue = QUEUE.filter(q => q.status === 'waiting' || q.status === 'called');
 
-  // 🎯 LOGIKA TERBARU (DIJAMIN SESUAI PERMINTAAN):
   activeQueue.sort((a, b) => {
     const isAWaiting = a.status === 'waiting';
     const isBWaiting = b.status === 'waiting';
 
-    // Rule 1: Status 'waiting' (MENUNGGU) HARUS SELALU DI PALING KIRI / PERTAMA
-    if (isAWaiting && !isBWaiting) return -1; // 'a' naik ke posisi #1
-    if (!isAWaiting && isBWaiting) return 1;  // 'b' naik ke posisi #1
+    if (isAWaiting && !isBWaiting) return -1;
+    if (!isAWaiting && isBWaiting) return 1;
 
-    // Rule 2: Jika sama-sama 'waiting', yang PALING BARU datang ada di paling kiri
-    // Rule 3: Jika sama-sama 'called', yang PALING BARU dipanggil ada di sebelah kiri
     const timeA = parseTime(a.calledAt) || parseTime(a.time);
     const timeB = parseTime(b.calledAt) || parseTime(b.time);
     return timeB - timeA;
@@ -356,11 +371,28 @@ window.doMarkDone = async function doMarkDone(id){
   }
 }
 
+// 🎯 FUNGSI JAM & TANGGAL OTOMATIS
 function tickClock(){
   const d = new Date();
-  document.getElementById('clock').textContent = d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  
+  // Format Hari, Tanggal Bulan Tahun
+  const optionsDate = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+  const formattedDate = d.toLocaleDateString('id-ID', optionsDate);
+  
+  // Format Jam & Menit
+  const hours = String(d.getHours()).padStart(2, '0');
+  const minutes = String(d.getMinutes()).padStart(2, '0');
+  const formattedTime = `${hours}.${minutes}`;
+  
+  const dateEl = document.getElementById('date-display');
+  const clockEl = document.getElementById('clock');
+  
+  if (dateEl) dateEl.textContent = formattedDate;
+  if (clockEl) clockEl.textContent = formattedTime;
 }
-setInterval(tickClock, 1000); tickClock();
+
+setInterval(tickClock, 1000); 
+tickClock();
 </script>
 </body>
 </html>
