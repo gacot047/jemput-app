@@ -9,6 +9,75 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+
+<style>
+  /* 1. Pengoptimalan Kotak Geolocation (Status Lokasi) */
+  .geo-pill {
+    background: #f0f4f9 !important;
+    border: 1px dashed #cbd5e1 !important;
+    box-shadow: none !important;
+  }
+
+  /* 2. Warna Status Badge 'Sudah Dipanggil' (Kontras Lebih Tegas) */
+  .status-tag {
+    background-color: #e2e8f0 !important;
+    color: #475569 !important;
+    font-weight: 700 !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  /* 3. Penyesuaian Tombol Lupa / Ganti PIN (Gaya Chip Action) */
+  .link-btn {
+    background: #e0f2fe;
+    color: #0369a1;
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-weight: 600;
+    font-size: 13px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .link-btn:active {
+    transform: scale(0.95);
+  }
+
+  /* 4. Filter Bar Kelas P1 - P6 */
+  .class-filter-wrap {
+    display: flex;
+    gap: 8px;
+    overflow-x: auto;
+    padding-bottom: 8px;
+    margin-bottom: 12px;
+    scrollbar-width: none; /* Firefox */
+  }
+  .class-filter-wrap::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+  .filter-chip {
+    background: #ffffff;
+    border: 1px solid #e2e8f0;
+    padding: 6px 14px;
+    border-radius: 16px;
+    font-size: 13px;
+    font-weight: 600;
+    color: #64748b;
+    white-space: nowrap;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .filter-chip.active {
+    background: #0F1C2E;
+    color: #ffffff;
+    border-color: #0F1C2E;
+  }
+
+  /* 5. Teks Avatar Inisial */
+  .avatar {
+    color: #ffffff !important;
+    font-weight: 700;
+  }
+</style>
 </head>
 <body>
 
@@ -59,11 +128,27 @@ let pickerName = '';
 let attempts = 0;
 const MAX_ATTEMPTS = 3;
 let mode = 'jemput'; // 'jemput' | 'gantipin'
+let selectedClassFilter = 'ALL'; // Filter kelas 'ALL' | 'P1' | 'P2' ...
 let cpStudent = null;
 let cpStage = 'current'; // 'current' | 'new' | 'confirm'
 let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
 let unsubWaiting = null; // listener aktif untuk layar status "menunggu dipanggil"
+
+// Warna Pastel untuk Avatar Inisial
+const AVATAR_COLORS = [
+  '#2563eb', '#7c3aed', '#db2777', '#ea580c', 
+  '#059669', '#0891b2', '#4f46e5', '#d97706'
+];
+
+function getAvatarBgColor(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
+}
 
 /* ---------------- GEOLOCATION ---------------- */
 window.checkLocation = function checkLocation(){
@@ -130,11 +215,23 @@ listenQueue((list)=>{ QUEUE = list; renderBody(); });
 
 function renderBody(){
   const el = document.getElementById('body-content');
+  const classes = ['ALL', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+
   el.innerHTML = `
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
       <input class="search-input" id="search-input" placeholder="Cari nama anak…" oninput="filterList()">
     </div>
+
+    <!-- Filter Bar Kelas P1 - P6 -->
+    <div class="class-filter-wrap">
+      ${classes.map(c => `
+        <button class="filter-chip ${selectedClassFilter === c ? 'active' : ''}" onclick="setClassFilter('${c}')">
+          ${c === 'ALL' ? 'Semua Kelas' : 'Kelas ' + c}
+        </button>
+      `).join('')}
+    </div>
+
     ${mode === 'gantipin' ? `
       <div class="mode-banner">
         <span>🔑 Mode Ganti PIN aktif — pilih nama anak untuk mengganti PIN keluarganya</span>
@@ -147,17 +244,36 @@ function renderBody(){
     </div>
     <div class="student-list" id="student-list"></div>
   `;
-  renderStudentList(ROSTER);
-  document.getElementById('search-input').oninput = filterList;
+  filterList();
 }
+
+window.setClassFilter = function setClassFilter(cls) {
+  selectedClassFilter = cls;
+  renderBody();
+}
+
 window.toggleChangePinMode = function toggleChangePinMode(){
   mode = mode === 'jemput' ? 'gantipin' : 'jemput';
   renderBody();
 }
-function filterList(){
-  const q = document.getElementById('search-input').value.toLowerCase();
-  renderStudentList(ROSTER.filter(s => s.name.toLowerCase().includes(q)));
+
+window.filterList = function filterList(){
+  const searchInput = document.getElementById('search-input');
+  const q = searchInput ? searchInput.value.toLowerCase() : '';
+  
+  let filtered = ROSTER;
+
+  if (selectedClassFilter !== 'ALL') {
+    filtered = filtered.filter(s => String(s.class).toUpperCase().includes(selectedClassFilter));
+  }
+
+  if (q) {
+    filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
+  }
+
+  renderStudentList(filtered);
 }
+
 function renderStudentList(list){
   const el = document.getElementById('student-list');
   if(!el) return;
@@ -168,11 +284,13 @@ function renderStudentList(list){
   el.innerHTML = list.map(s=>{
     const called = mode === 'jemput' && QUEUE.find(q=>q.studentId===s.id);
     const initials = s.name.split(' ').slice(0,2).map(w=>w[0]).join('');
+    const avatarBg = getAvatarBgColor(s.name);
     const handler = mode === 'jemput' ? `openPin('${s.id}')` : `openChangePin('${s.id}')`;
+    
     return `
     <div class="student-row ${called?'disabled':''}" ${called?'':`onclick="${handler}"`}>
       <div class="student-left">
-        <div class="avatar">${initials}</div>
+        <div class="avatar" style="background-color: ${avatarBg};">${initials}</div>
         <div>
           <div class="student-name">${s.name}</div>
           <div class="student-class">Kelas ${s.class}</div>
@@ -293,6 +411,7 @@ async function checkPin(){
     renderPinSheet(messages[result.reason] || 'Terjadi kesalahan, coba lagi.');
   }
 }
+
 function showWaitingScreen(queueId){
   if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
   const c = document.getElementById('sheet-content');
@@ -300,7 +419,6 @@ function showWaitingScreen(queueId){
 
   unsubWaiting = listenQueueEntry(queueId, (entry)=>{
     if(!entry){
-      // Dokumen sudah dihapus guru = anak sudah selesai diserahkan
       c.innerHTML = `
         <div class="success-wrap">
           <div class="success-icon">🎉</div>
@@ -341,7 +459,7 @@ function showWaitingScreen(queueId){
   });
 }
 
-/* ---------------- GANTI PIN (3 tahap: PIN lama → PIN baru → konfirmasi) ---------------- */
+/* ---------------- GANTI PIN ---------------- */
 window.openChangePin = function openChangePin(id){
   cpStudent = ROSTER.find(s=>s.id===id);
   cpStage = 'current'; cpPin = ''; cpVals = { current:'', new:'', confirm:'' };
