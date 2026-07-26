@@ -74,11 +74,18 @@
     position: relative;
   }
 
-  /* KARTU DIPANGGIL - Ditarik Paling Kiri Atas */
+  /* KARTU DIPANGGIL (Hijau) */
   .call-card.called {
     background: linear-gradient(135deg, #065F46 0%, #047857 100%);
     border: 3px solid #34D399;
     box-shadow: 0 0 25px rgba(52, 211, 153, 0.4);
+  }
+
+  /* KARTU MENUNGGU (Biru/Biasa - Berada Paling Depan/Kiri) */
+  .call-card.waiting {
+    background: #1E293B;
+    border: 2px solid #2563EB;
+    box-shadow: 0 0 15px rgba(37, 99, 235, 0.3);
   }
 
   .call-card-top {
@@ -116,8 +123,9 @@
   }
 
   .waiting-tag {
-    background: #334155;
-    color: #94A3B8;
+    background: #1E3A8A;
+    color: #93C5FD;
+    border: 1px solid #2563EB;
     padding: 4px 10px;
     border-radius: 12px;
     font-size: 12px;
@@ -222,7 +230,6 @@
 import { watchAdminSession, adminLogin, listenQueue, markCalled, markPickupDone } from "./firebase-config.js";
 
 let QUEUE = [];
-let localCalledTimes = {}; // Menimpan timestamp lokal saat tombol dipanggil diklik
 let unsubQueue = null;
 
 window.doLogin = async function doLogin(){
@@ -263,9 +270,9 @@ function parseTime(val) {
 }
 
 function timeAgo(item){
-  const calledTime = localCalledTimes[item.id] || parseTime(item.calledAt) || parseTime(item.time);
-  if(!calledTime) return 'baru saja';
-  const mins = Math.max(0, Math.floor((Date.now() - calledTime) / 60000));
+  const t = parseTime(item.time);
+  if(!t) return 'baru saja';
+  const mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
   if(mins < 1) return 'baru saja';
   return `${mins} menit lalu`;
 }
@@ -273,29 +280,22 @@ function timeAgo(item){
 function renderBoard(){
   const el = document.getElementById('board-content');
   
-  // Filter HANYA status 'waiting' dan 'called'
+  // Ambil status 'waiting' dan 'called'
   const activeQueue = QUEUE.filter(q => q.status === 'waiting' || q.status === 'called');
 
-  // LOGIKA URUTAN PERSIS:
+  // 🎯 LOGIKA TERBARU (DIJAMIN SESUAI PERMINTAAN):
   activeQueue.sort((a, b) => {
-    const isACalled = a.status === 'called';
-    const isBCalled = b.status === 'called';
+    const isAWaiting = a.status === 'waiting';
+    const isBWaiting = b.status === 'waiting';
 
-    // 1. Status 'called' HARUS selalu di depan (kiri) status 'waiting'
-    if (isACalled && !isBCalled) return -1;
-    if (!isACalled && isBCalled) return 1;
+    // Rule 1: Status 'waiting' (MENUNGGU) HARUS SELALU DI PALING KIRI / PERTAMA
+    if (isAWaiting && !isBWaiting) return -1; // 'a' naik ke posisi #1
+    if (!isAWaiting && isBWaiting) return 1;  // 'b' naik ke posisi #1
 
-    // 2. Jika SAMA-SAMA 'called', urutkan berdasarkan WAKTU DIPANGGIL (calledAt)
-    // Yang BARU DIPANGGIL Memiliki time panggil TERBESAR -> Tampil di PALING KIRI (#1)
-    if (isACalled && isBCalled) {
-      const timeA = localCalledTimes[a.id] || parseTime(a.calledAt) || parseTime(a.time);
-      const timeB = localCalledTimes[b.id] || parseTime(b.id) || parseTime(b.calledAt) || parseTime(b.time);
-      return timeB - timeA;
-    }
-
-    // 3. Jika SAMA-SAMA 'waiting', urutkan dari yang terbaru mendaftar
-    const timeA = parseTime(a.time);
-    const timeB = parseTime(b.time);
+    // Rule 2: Jika sama-sama 'waiting', yang PALING BARU datang ada di paling kiri
+    // Rule 3: Jika sama-sama 'called', yang PALING BARU dipanggil ada di sebelah kiri
+    const timeA = parseTime(a.calledAt) || parseTime(a.time);
+    const timeB = parseTime(b.calledAt) || parseTime(b.time);
     return timeB - timeA;
   });
 
@@ -306,13 +306,13 @@ function renderBoard(){
 
   el.innerHTML = `<div class="board-grid">
     ${activeQueue.map(q => {
-      const called = q.status === 'called';
-      const cardClass = called ? 'called' : '';
-      const actionBtn = called
+      const isCalled = q.status === 'called';
+      const cardClass = isCalled ? 'called' : 'waiting';
+      const actionBtn = isCalled
         ? `<button class="call-done-btn done-btn" onclick="doMarkDone('${q.id}')">✓ Selesai — Anak Diserahkan</button>`
         : `<button class="call-done-btn call-out-btn" onclick="doMarkCalled('${q.id}')">📢 Panggil Keluar</button>`;
       
-      const statusBadge = called 
+      const statusBadge = isCalled 
         ? `<span class="called-tag">🔔 DIPANGGIL</span>` 
         : `<span class="waiting-tag">⏳ MENUNGGU</span>`;
       
@@ -332,25 +332,14 @@ function renderBoard(){
   </div>`;
 }
 
-// FUNGSI PANGGIL: Mencatat timestamp panggil detik ini juga!
 window.doMarkCalled = async function doMarkCalled(id){
   try{
-    const now = Date.now();
-    
-    // Catat waktu panggil sekarang di memori lokal
-    localCalledTimes[id] = now;
-
-    // Update status lokal secara langsung
     const target = QUEUE.find(q => q.id === id);
     if (target) {
       target.status = 'called';
-      target.calledAt = now;
+      target.calledAt = Date.now();
+      renderBoard();
     }
-
-    // Render ulang langsung agar Cintya Aminudin LANGSUNG LOMPAT KE KIRI PERTAMA (#1)
-    renderBoard();
-
-    // Simpan perubahan ke database Firebase
     await markCalled(id);
   }catch(e){
     alert('Gagal menandai dipanggil, coba lagi.');
@@ -359,10 +348,8 @@ window.doMarkCalled = async function doMarkCalled(id){
 
 window.doMarkDone = async function doMarkDone(id){
   try{
-    delete localCalledTimes[id];
     QUEUE = QUEUE.filter(q => q.id !== id);
     renderBoard();
-
     await markPickupDone(id);
   }catch(e){
     alert('Gagal menandai selesai, coba lagi.');
