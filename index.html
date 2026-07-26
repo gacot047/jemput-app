@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0F1C2E">
-<title>Jemput — An Nashir Islamic School</title>
+<title>Aplikasi Penjemputan — An Nashir Islamic School</title>
 <link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -85,7 +85,7 @@
   <div class="topbar-brand">
     <div class="topbar-logo"><img src="logo.png" alt="Logo An Nashir Islamic School"></div>
     <div>
-      <div class="topbar-name">Jemput</div>
+      <div class="topbar-name">Aplikasi Penjemputan</div>
       <div class="topbar-sub">An Nashir Islamic School (SD)</div>
     </div>
   </div>
@@ -259,17 +259,22 @@ window.toggleChangePinMode = function toggleChangePinMode(){
 
 window.filterList = function filterList(){
   const searchInput = document.getElementById('search-input');
-  const q = searchInput ? searchInput.value.toLowerCase() : '';
+  const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
   
-  let filtered = ROSTER;
+  let filtered = [...ROSTER];
 
+  // 1. Filter Berdasarkan Kelas
   if (selectedClassFilter !== 'ALL') {
     filtered = filtered.filter(s => String(s.class).toUpperCase().includes(selectedClassFilter));
   }
 
+  // 2. Filter Berdasarkan Kata Kunci Pencarian Nama
   if (q) {
     filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
   }
+
+  // 🎯 3. URUTKAN SESUAI ABJAD A-Z
+  filtered.sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
 
   renderStudentList(filtered);
 }
