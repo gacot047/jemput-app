@@ -4,6 +4,12 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0F1C2E">
+
+<!-- Tag Meta PWA (Shortcut Layar Utama HP) -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Penjemputan">
+
 <title>Aplikasi Penjemputan — An Nashir Islamic School</title>
 <link rel="icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -18,7 +24,7 @@
     box-shadow: none !important;
   }
 
-  /* 2. Warna Status Badge 'Sudah Dipanggil' (Kontras Lebih Tegas) */
+  /* 2. Warna Status Badge 'Sudah Dipanggil' */
   .status-tag {
     background-color: #e2e8f0 !important;
     color: #475569 !important;
@@ -26,7 +32,7 @@
     border: 1px solid #cbd5e1 !important;
   }
 
-  /* 3. Penyesuaian Tombol Lupa / Ganti PIN (Gaya Chip Action) */
+  /* 3. Penyesuaian Tombol Lupa / Ganti PIN */
   .link-btn {
     background: #e0f2fe;
     color: #0369a1;
@@ -49,10 +55,10 @@
     overflow-x: auto;
     padding-bottom: 8px;
     margin-bottom: 12px;
-    scrollbar-width: none; /* Firefox */
+    scrollbar-width: none;
   }
   .class-filter-wrap::-webkit-scrollbar {
-    display: none; /* Chrome/Safari */
+    display: none;
   }
   .filter-chip {
     background: #ffffff;
@@ -72,10 +78,47 @@
     border-color: #0F1C2E;
   }
 
-  /* 5. Teks Avatar Inisial */
+  /* 5. Avatar & Skeleton Loader UI */
   .avatar {
     color: #ffffff !important;
     font-weight: 700;
+  }
+
+  .skeleton-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px;
+    background: #ffffff;
+    border-radius: 12px;
+    margin-bottom: 8px;
+  }
+  .skeleton-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: #e2e8f0;
+    animation: pulse 1.5s infinite ease-in-out;
+  }
+  .skeleton-text-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1;
+  }
+  .skeleton-line {
+    height: 12px;
+    border-radius: 6px;
+    background: #e2e8f0;
+    animation: pulse 1.5s infinite ease-in-out;
+  }
+  .skeleton-line.short { width: 40%; }
+  .skeleton-line.long { width: 75%; }
+
+  @keyframes pulse {
+    0% { opacity: 0.6; }
+    50% { opacity: 1; }
+    100% { opacity: 0.6; }
   }
 </style>
 </head>
@@ -133,7 +176,7 @@ let cpStudent = null;
 let cpStage = 'current'; // 'current' | 'new' | 'confirm'
 let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
-let unsubWaiting = null; // listener aktif untuk layar status "menunggu dipanggil"
+let unsubWaiting = null;
 
 // Warna Pastel untuk Avatar Inisial
 const AVATAR_COLORS = [
@@ -175,7 +218,10 @@ window.checkLocation = function checkLocation(){
   function finish(){
     if(finished) return;
     finished = true;
-    if(watchId !== null) navigator.geolocation.clearWatch(watchId);
+    if(watchId !== null) {
+      navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+    }
     if(best){
       coords = best;
       dot.className='geo-dot ok';
@@ -250,6 +296,8 @@ function renderBody(){
 window.setClassFilter = function setClassFilter(cls) {
   selectedClassFilter = cls;
   renderBody();
+  // Auto-scroll halus ke atas saat ganti kelas
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 window.toggleChangePinMode = function toggleChangePinMode(){
@@ -259,21 +307,20 @@ window.toggleChangePinMode = function toggleChangePinMode(){
 
 window.filterList = function filterList(){
   const searchInput = document.getElementById('search-input');
-  const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  // Membersihkan spasi tak sengaja atau spasi ganda
+  const q = searchInput ? searchInput.value.toLowerCase().trim().replace(/\s+/g, ' ') : '';
   
   let filtered = [...ROSTER];
 
-  // 1. Filter Berdasarkan Kelas
   if (selectedClassFilter !== 'ALL') {
     filtered = filtered.filter(s => String(s.class).toUpperCase().includes(selectedClassFilter));
   }
 
-  // 2. Filter Berdasarkan Kata Kunci Pencarian Nama
   if (q) {
     filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
   }
 
-  // 🎯 3. URUTKAN SESUAI ABJAD A-Z
+  // Urutan Abjad A-Z
   filtered.sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
 
   renderStudentList(filtered);
@@ -282,10 +329,26 @@ window.filterList = function filterList(){
 function renderStudentList(list){
   const el = document.getElementById('student-list');
   if(!el) return;
-  if(list.length===0){
-    el.innerHTML = `<div class="empty-state">${ROSTER.length===0 ? 'Memuat daftar siswa…' : 'Tidak ditemukan.'}</div>`;
+
+  // Skeleton Loader jika data belum siap
+  if(ROSTER.length === 0){
+    el.innerHTML = [1, 2, 3, 4].map(() => `
+      <div class="skeleton-row">
+        <div class="skeleton-avatar"></div>
+        <div class="skeleton-text-group">
+          <div class="skeleton-line long"></div>
+          <div class="skeleton-line short"></div>
+        </div>
+      </div>
+    `).join('');
     return;
   }
+
+  if(list.length === 0){
+    el.innerHTML = `<div class="empty-state">Tidak ditemukan.</div>`;
+    return;
+  }
+
   el.innerHTML = list.map(s=>{
     const called = mode === 'jemput' && QUEUE.find(q=>q.studentId===s.id);
     const initials = s.name.split(' ').slice(0,2).map(w=>w[0]).join('');
