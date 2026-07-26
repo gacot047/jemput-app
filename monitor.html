@@ -19,7 +19,6 @@
     margin: 0;
   }
 
-  /* Login Card */
   .login-card {
     max-width: 400px;
     margin: 0 auto;
@@ -36,7 +35,6 @@
     margin-bottom: 12px;
   }
 
-  /* Topbar */
   .board-topbar {
     display: flex;
     justify-content: space-between;
@@ -63,7 +61,6 @@
     gap: 20px;
   }
 
-  /* Call Cards */
   .call-card {
     background: #1E293B;
     border: 2px solid #334155;
@@ -77,17 +74,11 @@
     position: relative;
   }
 
-  /* Status Called / Dipanggil (Paling Kiri / Paling Atas) */
+  /* KARTU DIPANGGIL: Muncul Paling Kiri Atas, Berwarna Hijau */
   .call-card.called {
     background: linear-gradient(135deg, #065F46 0%, #047857 100%);
     border: 3px solid #34D399;
     box-shadow: 0 0 25px rgba(52, 211, 153, 0.4);
-    animation: pulseGlow 2s infinite alternate;
-  }
-
-  @keyframes pulseGlow {
-    0% { transform: scale(1); box-shadow: 0 0 15px rgba(52, 211, 153, 0.3); }
-    100% { transform: scale(1.02); box-shadow: 0 0 35px rgba(52, 211, 153, 0.6); }
   }
 
   .call-card-top {
@@ -153,7 +144,6 @@
     color: #A7F3D0;
   }
 
-  /* Buttons */
   .call-done-btn {
     width: 100%;
     padding: 12px;
@@ -195,12 +185,6 @@
     border: 2px dashed #334155;
     color: #94A3B8;
     font-size: 18px;
-  }
-  .board-empty b {
-    display: block;
-    font-size: 24px;
-    color: #F8FAFC;
-    margin-bottom: 8px;
   }
 </style>
 </head>
@@ -271,39 +255,48 @@ watchAdminSession((user)=>{
 
 function timeAgo(ts){
   if(!ts) return 'baru saja';
-  const millis = ts.toMillis ? ts.toMillis() : (ts.seconds ? ts.seconds * 1000 : new Date(ts).getTime());
+  const millis = ts.toMillis ? ts.toMillis() : (ts.seconds ? ts.seconds * 1000 : Number(ts));
+  if(isNaN(millis) || millis === 0) return 'baru saja';
   const mins = Math.max(0, Math.floor((Date.now()-millis)/60000));
   if(mins<1) return 'baru saja';
   return `${mins} menit lalu`;
 }
 
-function getTimestamp(q){
-  // Prioritas timestamp: waktu dipanggil (calledAt) -> waktu datang (time) -> 0
-  const t = q.calledAt || q.time;
-  if(!t) return 0;
-  return t.toMillis ? t.toMillis() : (t.seconds ? t.seconds * 1000 : new Date(t).getTime());
+// Konversi Timestamp ke Angka Milisekon untuk Pembandingan Precision
+function parseTime(val) {
+  if (!val) return 0;
+  if (typeof val === 'number') return val;
+  if (val.toMillis) return val.toMillis();
+  if (val.seconds) return val.seconds * 1000;
+  return new Date(val).getTime() || 0;
 }
 
 function renderBoard(){
   const el = document.getElementById('board-content');
   
-  // 1. Ambil HANYA status 'waiting' dan 'called' (Abaikan 'done' / 'completed')
+  // 1. Ambil HANYA antrean aktif ('waiting' dan 'called')
   const activeQueue = QUEUE.filter(q => q.status === 'waiting' || q.status === 'called');
 
-  // 2. LOGIKA SORTING KETAT & TERPERINCI
+  // 2. LOGIKA URUTAN PERSIS SESUAI KEINGINAN:
   activeQueue.sort((a, b) => {
     const isACalled = a.status === 'called';
     const isBCalled = b.status === 'called';
 
-    // Aturan 1: 'called' SELALU di sebelah kiri/atas daripada 'waiting'
-    if (isACalled && !isBCalled) return -1;
-    if (!isACalled && isBCalled) return 1;
+    // Rule A: Status 'called' HARUS di atas/kiri 'waiting'
+    if (isACalled && !isBCalled) return -1; // 'a' naik ke paling depan
+    if (!isACalled && isBCalled) return 1;  // 'b' naik ke paling depan
 
-    // Aturan 2: Jika sama-sama 'called', yang dipanggil TERBARU ada di PALING KIRI (teratas)
-    // Aturan 3: Jika sama-sama 'waiting', yang datang TERBARU ada di KIRI
-    const timeA = getTimestamp(a);
-    const timeB = getTimestamp(b);
-    return timeB - timeA; // Descending (Terbaru = Nilai terbesar = Paling Kiri)
+    // Rule B: Jika SAMA-SAMA 'called', yang dipanggil TERBARU harus berada di PALING KIRI
+    if (isACalled && isBCalled) {
+      const timeA = parseTime(a.calledAt) || parseTime(a.time);
+      const timeB = parseTime(b.calledAt) || parseTime(b.time);
+      return timeB - timeA; // Descending (Terbaru = Nilai terbesar = Paling Kiri)
+    }
+
+    // Rule C: Jika SAMA-SAMA 'waiting', yang mendaftar TERBARU ada di KIRI
+    const timeA = parseTime(a.time);
+    const timeB = parseTime(b.time);
+    return timeB - timeA;
   });
 
   if(activeQueue.length === 0){
@@ -339,8 +332,20 @@ function renderBoard(){
   </div>`;
 }
 
+// FUNGSI PANGGIL: Tandai status dan SIMPAN timestamp dipanggil (calledAt)
 window.doMarkCalled = async function doMarkCalled(id){
   try{
+    const now = Date.now();
+    
+    // Update lokal langsung supaya instan di layar
+    const target = QUEUE.find(q => q.id === id);
+    if (target) {
+      target.status = 'called';
+      target.calledAt = now;
+      renderBoard(); // Langsung render ulang agar lompat ke urutan #1 paling kiri!
+    }
+
+    // Simpan ke Firebase
     await markCalled(id);
   }catch(e){
     alert('Gagal menandai dipanggil, coba lagi.');
@@ -349,6 +354,11 @@ window.doMarkCalled = async function doMarkCalled(id){
 
 window.doMarkDone = async function doMarkDone(id){
   try{
+    // Hapus dari antrean lokal secara instan
+    QUEUE = QUEUE.filter(q => q.id !== id);
+    renderBoard();
+
+    // Simpan ke Firebase
     await markPickupDone(id);
   }catch(e){
     alert('Gagal menandai selesai, coba lagi.');
@@ -360,7 +370,6 @@ function tickClock(){
   document.getElementById('clock').textContent = d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
 }
 setInterval(tickClock, 1000); tickClock();
-setInterval(()=>{ if(document.getElementById('board-wrap').style.display!=='none') renderBoard(); }, 10000);
 </script>
 </body>
 </html>
