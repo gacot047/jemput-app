@@ -27,13 +27,13 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
-// Beberapa jaringan (WiFi sekolah/kantor dengan firewall/proxy) memblokir
-// koneksi streaming real-time bawaan Firestore, muncul sebagai error
-// "400 Bad Request" pada webchannel. `experimentalAutoDetectLongPolling`
-// membuat Firestore otomatis beralih ke metode koneksi long-polling biasa
-// (mirip request HTTP biasa) kalau mendeteksi streaming langsung gagal.
+// Jaringan ini rupanya memblokir metode koneksi streaming Firestore sejak
+// percobaan pertama (bukan cuma gagal sesekali), jadi kita langsung pakai
+// long-polling dari awal tanpa mencoba streaming sama sekali — lebih
+// lambat sepersekian detik, tapi jauh lebih tahan terhadap firewall/proxy
+// jaringan sekolah/kantor.
 export const db = initializeFirestore(app, {
-  experimentalAutoDetectLongPolling: true,
+  experimentalForceLongPolling: true,
 });
 export const auth = getAuth(app);
 const functions = getFunctions(app);
