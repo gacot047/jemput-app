@@ -11,7 +11,6 @@
 <link rel="stylesheet" href="style.css">
 
 <style>
-  /* Login Screen Custom styling */
   body.board-page {
     background-color: #0F1C2E;
     color: #F8FAFC;
@@ -36,7 +35,6 @@
     margin-bottom: 12px;
   }
 
-  /* Board Layout Custom Styling */
   .board-topbar {
     display: flex;
     justify-content: space-between;
@@ -77,11 +75,17 @@
     position: relative;
   }
 
-  /* Highlight dipanggil */
+  /* Highlight Dipanggil (Hijau Terang Bersinar) */
   .call-card.called {
     background: linear-gradient(135deg, #065F46 0%, #047857 100%);
-    border-color: #34D399;
-    box-shadow: 0 0 20px rgba(52, 211, 153, 0.3);
+    border: 3px solid #34D399;
+    box-shadow: 0 0 25px rgba(52, 211, 153, 0.4);
+    animation: pulseGlow 2s infinite alternate;
+  }
+
+  @keyframes pulseGlow {
+    0% { transform: scale(1); box-shadow: 0 0 15px rgba(52, 211, 153, 0.3); }
+    100% { transform: scale(1.02); box-shadow: 0 0 30px rgba(52, 211, 153, 0.6); }
   }
 
   .call-card-top {
@@ -137,7 +141,6 @@
     color: #A7F3D0;
   }
 
-  /* Action Buttons */
   .call-done-btn {
     width: 100%;
     padding: 12px;
@@ -171,7 +174,6 @@
     background: #047857;
   }
 
-  /* Empty State */
   .board-empty {
     text-align: center;
     padding: 80px 20px;
@@ -265,15 +267,22 @@ function timeAgo(ts){
 function renderBoard(){
   const el = document.getElementById('board-content');
   
-  // Filter HANYA antrean yang aktif ('waiting' atau 'called')
+  // 1. FILTER: Abaikan dokumen yang sudah 'completed' atau 'done'
   const activeQueue = QUEUE.filter(q => q.status === 'waiting' || q.status === 'called');
 
-  // Urutkan: 'called' (dipanggil) berada di urutan teratas, sisanya berdasarkan waktu terbaru
+  // 2. SORTING UTAMA:
+  // - Prioritas 1: Status 'called' selalu Paling Atas (Paling Kiri) dibanding 'waiting'
+  // - Prioritas 2: Waktu terbaru (time paling besar) muncul lebih dulu
   activeQueue.sort((a, b) => {
-    if (a.status === 'called' && b.status !== 'called') return -1;
-    if (a.status !== 'called' && b.status === 'called') return 1;
-    const ta = a.time?.toMillis ? a.time.toMillis() : 0;
-    const tb = b.time?.toMillis ? b.time.toMillis() : 0;
+    const isACalled = a.status === 'called';
+    const isBCalled = b.status === 'called';
+
+    if (isACalled && !isBCalled) return -1; // a naik ke paling kiri/atas
+    if (!isACalled && isBCalled) return 1;  // b naik ke paling kiri/atas
+
+    // Jika statusnya sama (sama-sama called / sama-sama waiting), urutkan waktu terbaru
+    const ta = a.calledAt?.toMillis ? a.calledAt.toMillis() : (a.time?.toMillis ? a.time.toMillis() : 0);
+    const tb = b.calledAt?.toMillis ? b.calledAt.toMillis() : (b.time?.toMillis ? b.time.toMillis() : 0);
     return tb - ta;
   });
 
@@ -290,7 +299,7 @@ function renderBoard(){
         ? `<button class="call-done-btn done-btn" onclick="doMarkDone('${q.id}')">✓ Selesai — Anak Diserahkan</button>`
         : `<button class="call-done-btn call-out-btn" onclick="doMarkCalled('${q.id}')">📢 Panggil Keluar</button>`;
       
-      const statusBadge = called ? `<span class="called-tag">🔔 Dipanggil</span>` : '<span></span>';
+      const statusBadge = called ? `<span class="called-tag">🔔 DIPANGGIL</span>` : '<span></span>';
       
       return `
       <div class="call-card ${cardClass}">
