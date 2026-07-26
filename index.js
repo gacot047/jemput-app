@@ -29,6 +29,27 @@ function distanceMeters(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
+/* ---------- helper: cek apakah lat/lng berada dalam radius sekolah ---------- */
+async function checkGeofence(lat, lng, accuracy) {
+  const configSnap = await db.doc("admin_config/settings").get();
+  const config = configSnap.exists ? configSnap.data() : null;
+  if (!config || !config.schoolLat || !config.schoolLng || !config.radiusMeters) {
+    return true; // belum diatur admin, tidak ada pembatasan radius
+  }
+  if (typeof lat !== "number" || typeof lng !== "number") {
+    throw new HttpsError("invalid-argument", "Lokasi tidak terdeteksi.");
+  }
+  const dist = distanceMeters(lat, lng, config.schoolLat, config.schoolLng);
+  // GPS di HP tidak pernah 100% presisi — browser melaporkan seberapa besar
+  // kemungkinan melesetnya lewat `accuracy` (dalam meter). Kita tambahkan
+  // itu sebagai toleransi, dibatasi maksimum ACCURACY_CAP supaya tidak bisa
+  // disalahgunakan dengan mengirim accuracy palsu yang sangat besar.
+  const ACCURACY_CAP = 150;
+  const buffer = Math.min(typeof accuracy === "number" ? accuracy : 0, ACCURACY_CAP);
+  const allowedRadius = config.radiusMeters + buffer;
+  return dist <= allowedRadius;
+}
+
 /**
  * requestPickup — dipanggil dari Aplikasi Orang Tua.
  * Input:  { studentId, pin, pickerName, lat, lng }
@@ -43,26 +64,9 @@ exports.requestPickup = onCall(async (request) => {
     throw new HttpsError("invalid-argument", "studentId dan pin wajib diisi.");
   }
 
-  // 1) Cek radius sekolah (kalau admin sudah mengatur titik koordinat)
-  const configSnap = await db.doc("admin_config/settings").get();
-  const config = configSnap.exists ? configSnap.data() : null;
-  if (config && config.schoolLat && config.schoolLng && config.radiusMeters) {
-    if (typeof lat !== "number" || typeof lng !== "number") {
-      throw new HttpsError("invalid-argument", "Lokasi tidak terdeteksi.");
-    }
-    const dist = distanceMeters(lat, lng, config.schoolLat, config.schoolLng);
-    // GPS di HP tidak pernah 100% presisi — browser melaporkan seberapa
-    // besar kemungkinan melesetnya lewat `accuracy` (dalam meter). Kita
-    // tambahkan itu sebagai toleransi, dibatasi maksimum ACCURACY_CAP
-    // supaya tidak bisa disalahgunakan dengan mengirim accuracy palsu
-    // yang sangat besar. Ini lebih tepat daripada memperbesar radius
-    // tetap untuk semua orang.
-    const ACCURACY_CAP = 150;
-    const buffer = Math.min(typeof accuracy === "number" ? accuracy : 0, ACCURACY_CAP);
-    const allowedRadius = config.radiusMeters + buffer;
-    if (dist > allowedRadius) {
-      return { ok: false, reason: "out_of_range" };
-    }
+  const inRange = await checkGeofence(lat, lng, accuracy);
+  if (!inRange) {
+    return { ok: false, reason: "out_of_range" };
   }
 
   const privRef = db.doc(`students_private/${studentId}`);
@@ -109,12 +113,76 @@ exports.requestPickup = onCall(async (request) => {
 
   // 5) PIN benar → reset percobaan gagal, masukkan ke antrean
   await privRef.update({ failedAttempts: 0, lockUntil: FieldValue.delete() });
-  await db.collection("queue").add({
+  const queueRef = await db.collection("queue").add({
     studentId,
     name: pub.name,
     class: pub.class,
     picker: pickerName || "—",
+    status: "waiting", // 'waiting' -> 'called' -> (dihapus saat selesai diserahkan)
     time: FieldValue.serverTimestamp(),
+  });
+
+  return { ok: true, queueId: queueRef.id };
+});
+
+/**
+ * changeFamilyPin — dipanggil dari Aplikasi Orang Tua, TANPA login.
+ * Orang tua membuktikan diri dengan mengetahui PIN LAMA (mirip ganti PIN
+ * ATM). Berguna kalau PIN sempat diketahui pihak lain (misalnya driver
+ * ojek online yang menjemputkan anak sekali waktu).
+ * Input:  { studentId, currentPin, newPin, lat, lng }
+ * Output: { ok: true } atau { ok:false, reason, attemptsLeft? }
+ */
+exports.changeFamilyPin = onCall(async (request) => {
+  const { studentId, currentPin, newPin, lat, lng, accuracy } = request.data || {};
+  if (!studentId || !currentPin || !newPin) {
+    throw new HttpsError("invalid-argument", "PIN lama dan PIN baru wajib diisi.");
+  }
+  if (!/^\d{4}$/.test(String(newPin))) {
+    throw new HttpsError("invalid-argument", "PIN baru harus 4 digit angka.");
+  }
+
+  const inRange = await checkGeofence(lat, lng, accuracy);
+  if (!inRange) {
+    return { ok: false, reason: "out_of_range" };
+  }
+
+  const privRef = db.doc(`students_private/${studentId}`);
+  const privSnap = await privRef.get();
+  if (!privSnap.exists) {
+    throw new HttpsError("not-found", "Siswa tidak ditemukan.");
+  }
+  const priv = privSnap.data();
+
+  // Memakai penghitung percobaan gagal yang SAMA dengan requestPickup —
+  // supaya orang yang coba menebak-nebak PIN lewat sini pun ikut terkena
+  // kunci otomatis, bukan celah terpisah.
+  if (priv.lockUntil && priv.lockUntil.toMillis() > Date.now()) {
+    return { ok: false, reason: "locked" };
+  }
+
+  const computed = hashPin(String(currentPin), priv.salt);
+  if (computed !== priv.pinHash) {
+    const attempts = (priv.failedAttempts || 0) + 1;
+    const update = { failedAttempts: attempts };
+    if (attempts >= MAX_ATTEMPTS) {
+      update.lockUntil = new Date(Date.now() + LOCK_MINUTES * 60000);
+      update.failedAttempts = 0;
+    }
+    await privRef.update(update);
+    return {
+      ok: false,
+      reason: attempts >= MAX_ATTEMPTS ? "locked" : "wrong_pin",
+      attemptsLeft: Math.max(0, MAX_ATTEMPTS - attempts),
+    };
+  }
+
+  const salt = makeSalt();
+  await privRef.update({
+    pinHash: hashPin(String(newPin), salt),
+    salt,
+    failedAttempts: 0,
+    lockUntil: FieldValue.delete(),
   });
 
   return { ok: true };

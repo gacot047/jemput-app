@@ -23,7 +23,7 @@ import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
 import {
-  doc, deleteDoc,
+  doc, deleteDoc, updateDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
@@ -38,12 +38,23 @@ export function listenRoster(onChange) {
   });
 }
 
-/* ---------- antrean penjemputan: dengar secara real-time ---------- */
+/* ---------- antrean penjemputan: dengar seluruh antrean (untuk Layar Kelas) ---------- */
 export function listenQueue(onChange) {
   return onSnapshot(collection(db, "queue"), (snap) => {
     onChange(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
+/* ---------- antrean penjemputan: dengar SATU entri (untuk status di HP orang tua) ---------- */
+export function listenQueueEntry(queueId, onChange) {
+  return onSnapshot(doc(db, "queue", queueId), (snap) => {
+    onChange(snap.exists() ? { id: snap.id, ...snap.data() } : null);
+  });
+}
+/* ---------- guru: tandai siswa sudah dipanggil keluar (belum selesai diserahkan) ---------- */
+export async function markCalled(entryId) {
+  await updateDoc(doc(db, "queue", entryId), { status: "called", calledAt: serverTimestamp() });
+}
+/* ---------- guru: tandai selesai diserahkan -> hapus dari papan ---------- */
 export async function markPickupDone(entryId) {
   await deleteDoc(doc(db, "queue", entryId));
 }

@@ -1,0 +1,44 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Nama & kelas siswa — boleh dibaca siapa saja (dipakai Aplikasi Orang Tua
+    // untuk menampilkan daftar & pencarian). TIDAK BOLEH ditulis langsung dari
+    // browser — semua perubahan wajib lewat Cloud Function supaya PIN tidak
+    // pernah lewat jalur yang bisa dibaca orang lain.
+    match /students_public/{studentId} {
+      allow read: if true;
+      allow write: if false;
+    }
+
+    // PIN (dalam bentuk hash+salt) — TIDAK BOLEH dibaca atau ditulis dari
+    // browser sama sekali, dalam kondisi apapun. Hanya Cloud Function
+    // (lewat Admin SDK) yang bisa menyentuh koleksi ini.
+    match /students_private/{studentId} {
+      allow read: if false;
+      allow write: if false;
+    }
+
+    // Antrean penjemputan yang tampil di Layar Kelas.
+    // - Baca: publik (perlu untuk Layar Kelas & status "sudah dipanggil")
+    // - Buat entri baru: HANYA Cloud Function (setelah PIN diverifikasi)
+    // - Ubah status (mis. "waiting" -> "called"): hanya akun guru/admin yang sudah login
+    // - Hapus (tandai selesai diserahkan): hanya akun guru/admin yang sudah login
+    match /queue/{entryId} {
+      allow read: if true;
+      allow create: if false;
+      allow update: if request.auth != null;
+      allow delete: if request.auth != null;
+    }
+
+    // Pengaturan sekolah (titik koordinat gerbang, radius geofence, nama
+    // sekolah, dsb). Publik boleh baca (dipakai untuk cek radius di HP
+    // orang tua), tapi hanya bisa diubah lewat Firebase Console atau
+    // Cloud Function admin — tidak langsung dari client.
+    match /admin_config/{docId} {
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

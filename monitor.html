@@ -41,7 +41,7 @@
 </div>
 
 <script type="module">
-import { watchAdminSession, adminLogin, listenQueue, markPickupDone } from "./firebase-config.js";
+import { watchAdminSession, adminLogin, listenQueue, markCalled, markPickupDone } from "./firebase-config.js";
 
 let QUEUE = [];
 let unsubQueue = null;
@@ -97,14 +97,28 @@ function renderBoard(){
     ${queue.map(q=>{
       const millis = q.time?.toMillis ? q.time.toMillis() : Date.now();
       const fresh = (Date.now()-millis) < 20000;
+      const called = q.status === 'called';
+      const cardClass = called ? 'called' : (fresh ? 'fresh' : '');
+      const actionBtn = called
+        ? `<button class="call-done-btn done-btn" onclick="doMarkDone('${q.id}')">✓ Selesai — anak sudah diserahkan</button>`
+        : `<button class="call-done-btn call-out-btn" onclick="doMarkCalled('${q.id}')">📢 Panggil Keluar</button>`;
+      const statusTag = called ? `<span class="called-tag">✓ Sudah dipanggil</span>` : '';
       return `
-      <div class="call-card ${fresh?'fresh':''}">
+      <div class="call-card ${cardClass}">
+        ${statusTag}
         <div class="call-name">${q.name} <span class="from-tag">from ${q.class}</span></div>
         <div class="call-meta">Dijemput oleh ${q.picker} · ${timeAgo(q.time)}</div>
-        <button class="call-done-btn" onclick="doMarkDone('${q.id}')">✓ Selesai — anak sudah diserahkan</button>
+        ${actionBtn}
       </div>`;
     }).join('')}
   </div>`;
+}
+window.doMarkCalled = async function doMarkCalled(id){
+  try{
+    await markCalled(id);
+  }catch(e){
+    alert('Gagal menandai dipanggil, coba lagi.');
+  }
 }
 window.doMarkDone = async function doMarkDone(id){
   try{

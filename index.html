@@ -48,7 +48,7 @@
 </div>
 
 <script type="module">
-import { listenRoster, listenQueue, submitPickup, changeFamilyPin } from "./firebase-config.js";
+import { listenRoster, listenQueue, submitPickup, changeFamilyPin, listenQueueEntry } from "./firebase-config.js";
 
 let ROSTER = [];
 let QUEUE = [];
@@ -63,6 +63,7 @@ let cpStudent = null;
 let cpStage = 'current'; // 'current' | 'new' | 'confirm'
 let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
+let unsubWaiting = null; // listener aktif untuk layar status "menunggu dipanggil"
 
 /* ---------------- GEOLOCATION ---------------- */
 window.checkLocation = function checkLocation(){
@@ -188,6 +189,7 @@ function renderStudentList(list){
 
 /* ---------------- PIN SHEET ---------------- */
 window.openPin = function openPin(id){
+  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
   selectedStudent = ROSTER.find(s=>s.id===id);
   pin=''; attempts=0; pickerName='';
   renderPinSheet();
@@ -196,6 +198,7 @@ window.openPin = function openPin(id){
 }
 window.closeSheet = function closeSheet(){
   document.getElementById('sheet-overlay').classList.remove('open');
+  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
 }
 window.updatePickerName = function updatePickerName(v){
   pickerName = v;
@@ -262,7 +265,7 @@ async function checkPin(){
   c.style.opacity='1'; c.style.pointerEvents='auto';
 
   if(result.ok){
-    showSuccess();
+    showWaitingScreen(result.queueId);
     return;
   }
 
@@ -294,17 +297,53 @@ async function checkPin(){
     renderPinSheet(messages[result.reason] || 'Terjadi kesalahan, coba lagi.');
   }
 }
-function showSuccess(){
+function showWaitingScreen(queueId){
+  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
   const c = document.getElementById('sheet-content');
-  c.innerHTML = `
-    <div class="success-wrap">
-      <div class="success-icon">✓</div>
-      <div class="success-title">Terkirim ke Layar Kelas</div>
-      <div class="success-sub">Guru akan mengumumkan nama anak Anda. Silakan tunggu di luar atau di mobil.</div>
-      <div class="success-name">Menjemput <b>${selectedStudent.name}</b><br><span style="font-size:12px;color:var(--slate);">Kelas ${selectedStudent.class}</span></div>
-      <button class="sheet-btn" onclick="closeSheet()">Selesai</button>
-    </div>
-  `;
+  let lastStatus = null;
+
+  unsubWaiting = listenQueueEntry(queueId, (entry)=>{
+    if(!entry){
+      // Dokumen sudah dihapus guru = anak sudah selesai diserahkan
+      c.innerHTML = `
+        <div class="success-wrap">
+          <div class="success-icon">🎉</div>
+          <div class="success-title">Penjemputan Selesai</div>
+          <div class="success-sub">Terima kasih. <b>${selectedStudent.name}</b> sudah diserahkan kepada penjemput.</div>
+          <button class="sheet-btn" onclick="closeSheet()">Tutup</button>
+        </div>
+      `;
+      if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
+      return;
+    }
+
+    if(entry.status === 'called' && lastStatus !== 'called' && navigator.vibrate){
+      navigator.vibrate([250,120,250,120,250]);
+    }
+    lastStatus = entry.status;
+
+    if(entry.status === 'called'){
+      c.innerHTML = `
+        <div class="success-wrap">
+          <div class="success-icon called-icon">🔔</div>
+          <div class="success-title">Anak Anda Sudah Keluar!</div>
+          <div class="success-sub">Silakan sambut <b>${entry.name}</b> di gerbang sekarang.</div>
+          <div class="success-name">Kelas ${entry.class}</div>
+          <button class="sheet-btn" onclick="closeSheet()">Tutup</button>
+        </div>
+      `;
+    } else {
+      c.innerHTML = `
+        <div class="success-wrap">
+          <div class="success-icon waiting-icon">⏳</div>
+          <div class="success-title">Menunggu Dipanggil</div>
+          <div class="success-sub">Anak Anda segera dipanggil oleh guru. Halaman ini otomatis update — silakan tunggu di luar atau di mobil, tanpa perlu menutup halaman ini.</div>
+          <div class="success-name">Menjemput <b>${entry.name}</b><br><span style="font-size:12px;color:var(--slate);">Kelas ${entry.class}</span></div>
+          <button class="sheet-btn ghost" onclick="closeSheet()">Tutup jendela ini</button>
+        </div>
+      `;
+    }
+  });
 }
 
 /* ---------------- GANTI PIN (3 tahap: PIN lama → PIN baru → konfirmasi) ---------------- */
