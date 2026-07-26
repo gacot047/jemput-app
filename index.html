@@ -5,13 +5,17 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0F1C2E">
 
-<!-- Tag Meta PWA (Shortcut Layar Utama HP) -->
+<!-- Integration Web App Manifest (PWA) -->
+<link rel="manifest" href="manifest.json">
+
+<!-- Meta Tag iOS / Android Shortcut -->
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Penjemputan">
 
 <title>Aplikasi Penjemputan — An Nashir Islamic School</title>
 <link rel="icon" href="logo.png">
+<link rel="apple-touch-icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
@@ -296,7 +300,6 @@ function renderBody(){
 window.setClassFilter = function setClassFilter(cls) {
   selectedClassFilter = cls;
   renderBody();
-  // Auto-scroll halus ke atas saat ganti kelas
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -307,7 +310,6 @@ window.toggleChangePinMode = function toggleChangePinMode(){
 
 window.filterList = function filterList(){
   const searchInput = document.getElementById('search-input');
-  // Membersihkan spasi tak sengaja atau spasi ganda
   const q = searchInput ? searchInput.value.toLowerCase().trim().replace(/\s+/g, ' ') : '';
   
   let filtered = [...ROSTER];
@@ -330,7 +332,6 @@ function renderStudentList(list){
   const el = document.getElementById('student-list');
   if(!el) return;
 
-  // Skeleton Loader jika data belum siap
   if(ROSTER.length === 0){
     el.innerHTML = [1, 2, 3, 4].map(() => `
       <div class="skeleton-row">

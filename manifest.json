@@ -1,0 +1,21 @@
+{
+  "short_name": "Penjemputan",
+  "name": "Aplikasi Penjemputan — An Nashir",
+  "icons": [
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./index.html",
+  "background_color": "#0F1C2E",
+  "theme_color": "#0F1C2E",
+  "display": "standalone",
+  "orientation": "portrait"
+}
