@@ -14,7 +14,7 @@ export const firebaseConfig = {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  getFirestore, collection, onSnapshot,
+  initializeFirestore, collection, onSnapshot,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getFunctions, httpsCallable,
@@ -27,7 +27,14 @@ import {
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
-export const db = getFirestore(app);
+// Beberapa jaringan (WiFi sekolah/kantor dengan firewall/proxy) memblokir
+// koneksi streaming real-time bawaan Firestore, muncul sebagai error
+// "400 Bad Request" pada webchannel. `experimentalAutoDetectLongPolling`
+// membuat Firestore otomatis beralih ke metode koneksi long-polling biasa
+// (mirip request HTTP biasa) kalau mendeteksi streaming langsung gagal.
+export const db = initializeFirestore(app, {
+  experimentalAutoDetectLongPolling: true,
+});
 export const auth = getAuth(app);
 const functions = getFunctions(app);
 
