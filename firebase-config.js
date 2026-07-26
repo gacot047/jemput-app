@@ -15,6 +15,7 @@ export const firebaseConfig = {
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
   initializeFirestore, collection, onSnapshot,
+  doc, deleteDoc, updateDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
   getFunctions, httpsCallable,
@@ -22,19 +23,16 @@ import {
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-import {
-  doc, deleteDoc, updateDoc, serverTimestamp,
-} from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
 const app = initializeApp(firebaseConfig);
-// Jaringan ini rupanya memblokir metode koneksi streaming Firestore sejak
-// percobaan pertama (bukan cuma gagal sesekali), jadi kita langsung pakai
-// long-polling dari awal tanpa mencoba streaming sama sekali — lebih
-// lambat sepersekian detik, tapi jauh lebih tahan terhadap firewall/proxy
-// jaringan sekolah/kantor.
+
+// Memaksa Firestore menggunakan long-polling murni dan mematikan Fetch Streams
+// agar tidak terkena error WebChannel (400/404) akibat pembatasan jaringan/firewall.
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
+  useFetchStreams: false,
 });
+
 export const auth = getAuth(app);
 const functions = getFunctions(app);
 
@@ -51,16 +49,19 @@ export function listenQueue(onChange) {
     onChange(snap.docs.map(d => ({ id: d.id, ...d.data() })));
   });
 }
+
 /* ---------- antrean penjemputan: dengar SATU entri (untuk status di HP orang tua) ---------- */
 export function listenQueueEntry(queueId, onChange) {
   return onSnapshot(doc(db, "queue", queueId), (snap) => {
     onChange(snap.exists() ? { id: snap.id, ...snap.data() } : null);
   });
 }
+
 /* ---------- guru: tandai siswa sudah dipanggil keluar (belum selesai diserahkan) ---------- */
 export async function markCalled(entryId) {
   await updateDoc(doc(db, "queue", entryId), { status: "called", calledAt: serverTimestamp() });
 }
+
 /* ---------- guru: tandai selesai diserahkan -> hapus dari papan ---------- */
 export async function markPickupDone(entryId) {
   await deleteDoc(doc(db, "queue", entryId));
