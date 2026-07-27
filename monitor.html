@@ -2,406 +2,268 @@
 <html lang="id">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<meta name="theme-color" content="#0F1C2E">
-<title>Layar Kelas — An Nashir Islamic School</title>
-<link rel="icon" href="logo.png">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Papan Penjemputan — An Nashir Islamic School</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 
 <style>
-  body.board-page {
-    background-color: #0F1C2E;
-    color: #F8FAFC;
+  :root {
+    --bg-color: #0d1520;
+    --card-bg: #064e3b;
+    --card-border: #10b981;
+    --text-main: #ffffff;
+    --text-sub: #a7f3d0;
+    --accent-yellow: #f59e0b;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background-color: var(--bg-color);
+    color: var(--text-main);
     font-family: 'Plus Jakarta Sans', sans-serif;
     min-height: 100vh;
-    margin: 0;
-  }
-
-  .login-card {
-    max-width: 400px;
-    margin: 0 auto;
-    background: #1E293B;
-    border: 1px solid #334155;
-    padding: 32px;
-    border-radius: 24px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.5);
-  }
-
-  .lock-icon {
-    font-size: 40px;
-    text-align: center;
-    margin-bottom: 12px;
-  }
-
-  .board-topbar {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 16px 24px;
-    background: #0F1C2E;
-    border-bottom: 2px solid #1E293B;
-  }
-
-  .clock-wrapper {
-    text-align: right;
-  }
-
-  .board-date {
-    font-size: 14px;
-    font-weight: 700;
-    color: #94A3B8;
-    text-transform: capitalize;
-    margin-bottom: 2px;
-  }
-
-  .board-clock {
-    font-size: 32px;
-    font-weight: 800;
-    color: #F59E0B;
-    font-variant-numeric: tabular-nums;
-    line-height: 1.1;
-  }
-
-  .board-content {
     padding: 24px;
   }
 
-  .board-grid {
+  /* Header Header & Jam */
+  .header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+  }
+  .brand { display: flex; align-items: center; gap: 16px; }
+  .logo { width: 50px; height: 50px; object-fit: contain; }
+  .title { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; }
+  .subtitle { font-size: 14px; color: #94a3b8; font-weight: 600; letter-spacing: 1px; }
+
+  .clock-box { text-align: right; }
+  .date-str { font-size: 14px; color: #94a3b8; font-weight: 600; }
+  .time-str { font-family: 'Space Grotesk', sans-serif; font-size: 36px; font-weight: 700; color: var(--accent-yellow); line-height: 1; }
+
+  /* FILTER BAR KELAS (Semua, P1 - P6) */
+  .filter-bar {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 24px;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    overflow-x: auto;
+  }
+  .filter-btn {
+    background: transparent;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    color: #cbd5e1;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+  .filter-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+  }
+  .filter-btn.active {
+    background: #10b981;
+    color: #ffffff;
+    border-color: #10b981;
+    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+  }
+
+  /* Grid Kartu Monitor */
+  .grid {
     display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+    grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
     gap: 20px;
   }
 
-  .call-card {
-    background: #1E293B;
-    border: 2px solid #334155;
+  .card {
+    background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
+    border: 2px solid var(--card-border);
     border-radius: 16px;
     padding: 20px;
+    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
-    min-height: 180px;
-    transition: all 0.3s ease;
-    position: relative;
+    animation: fadeIn 0.3s ease-out;
   }
 
-  /* KARTU DIPANGGIL (Hijau) */
-  .call-card.called {
-    background: linear-gradient(135deg, #065F46 0%, #047857 100%);
-    border: 3px solid #34D399;
-    box-shadow: 0 0 25px rgba(52, 211, 153, 0.4);
-  }
-
-  /* KARTU MENUNGGU (Biru) */
-  .call-card.waiting {
-    background: #1E293B;
-    border: 2px solid #2563EB;
-    box-shadow: 0 0 15px rgba(37, 99, 235, 0.3);
-  }
-
-  .call-card-top {
+  .card-top {
     display: flex;
     justify-content: space-between;
-    align-items: flex-start;
-    margin-bottom: 12px;
+    align-items: center;
+    margin-bottom: 14px;
   }
-
-  .class-badge {
-    background: #0F1C2E;
-    color: #38BDF8;
+  .badge-dipanggil {
+    background: rgba(245, 158, 11, 0.2);
+    color: var(--accent-yellow);
+    border: 1px solid var(--accent-yellow);
+    padding: 4px 10px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .badge-kelas {
+    background: rgba(0,0,0,0.4);
+    color: #ffffff;
     padding: 4px 12px;
-    border-radius: 10px;
+    border-radius: 8px;
     font-size: 13px;
-    font-weight: 800;
-    border: 1px solid #334155;
+    font-weight: 700;
   }
 
-  .call-card.called .class-badge {
-    background: #022C22;
-    color: #34D399;
-    border-color: #059669;
-  }
-
-  .called-tag {
-    background: #022C22;
-    color: #6EE7B7;
-    border: 1px solid #059669;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .waiting-tag {
-    background: #1E3A8A;
-    color: #93C5FD;
-    border: 1px solid #2563EB;
-    padding: 4px 10px;
-    border-radius: 12px;
-    font-size: 12px;
-    font-weight: 800;
-    text-transform: uppercase;
-  }
-
-  .call-name {
+  .student-name {
     font-size: 24px;
     font-weight: 800;
-    color: #FFFFFF;
+    color: #ffffff;
+    margin-bottom: 8px;
     line-height: 1.2;
-    margin-bottom: 6px;
   }
-
-  .call-meta {
-    font-size: 14px;
-    color: #94A3B8;
-    font-weight: 600;
+  .picker-info {
+    font-size: 15px;
+    color: var(--text-sub);
     margin-bottom: 16px;
   }
 
-  .call-card.called .call-meta {
-    color: #A7F3D0;
-  }
-
-  .call-done-btn {
+  .btn-action {
     width: 100%;
-    padding: 12px;
-    border-radius: 12px;
-    font-size: 15px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(16, 185, 129, 0.5);
+    color: #a7f3d0;
+    padding: 10px;
+    border-radius: 8px;
     font-weight: 700;
-    border: none;
-    cursor: pointer;
-    transition: all 0.2s;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-  }
-
-  .call-out-btn {
-    background: #2563EB;
-    color: #FFFFFF;
-  }
-  .call-out-btn:active {
-    transform: scale(0.97);
-    background: #1D4ED8;
-  }
-
-  /* STYLE UNTUK STATUS SUDAH DIPANGGIL (NON-KLIK) */
-  .status-called-box {
-    width: 100%;
-    padding: 12px;
-    border-radius: 12px;
     font-size: 14px;
-    font-weight: 800;
-    background: rgba(2, 44, 34, 0.6);
-    color: #6EE7B7;
-    border: 1px solid #059669;
     text-align: center;
-    box-sizing: border-box;
   }
 
-  .board-empty {
+  .empty-state {
+    grid-column: 1 / -1;
     text-align: center;
-    padding: 80px 20px;
-    background: #1E293B;
-    border-radius: 20px;
-    border: 2px dashed #334155;
-    color: #94A3B8;
+    padding: 60px;
+    color: #64748b;
     font-size: 18px;
+    font-weight: 600;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(100px); }
+    to { opacity: 1; transform: translateY(0); }
   }
 </style>
 </head>
-<body class="board-page">
+<body>
 
-<!-- LOGIN GATE -->
-<div id="login-wrap" class="login-wrap" style="padding-top:100px;">
-  <div class="login-card">
-    <div class="lock-icon">🔒</div>
-    <div class="admin-title" style="text-align:center;">Masuk Perangkat Layar Kelas</div>
-    <div class="admin-sub" style="text-align:center; margin-bottom: 20px;">Login sekali di perangkat TV/monitor ini, lalu biarkan tetap terbuka.</div>
-    <input class="text-input" id="login-email" type="email" placeholder="Email guru/admin" style="margin-bottom:12px;">
-    <input class="text-input" id="login-pass" type="password" placeholder="Kata sandi" onkeydown="if(event.key==='Enter') doLogin()" style="margin-bottom:12px;">
-    <div class="pin-error" id="login-error" style="margin-bottom:12px; color:#EF4444; text-align:center;"></div>
-    <button class="sheet-btn" onclick="doLogin()">Masuk</button>
+<div class="header">
+  <div class="brand">
+    <img src="logo.png" alt="Logo" class="logo">
+    <div>
+      <div class="title">Papan Penjemputan</div>
+      <div class="subtitle">AN NASHIR ISLAMIC SCHOOL (SD) · LIVE</div>
+    </div>
+  </div>
+  <div class="clock-box">
+    <div class="date-str" id="date-str">--</div>
+    <div class="time-str" id="time-str">--:--</div>
   </div>
 </div>
 
-<!-- BOARD -->
-<div id="board-wrap" style="display:none;">
-  <div class="topbar board-topbar">
-    <div class="topbar-brand">
-      <div class="topbar-logo" style="width:48px;height:48px;"><img src="logo.png" alt="Logo"></div>
-      <div>
-        <div class="topbar-name">Papan Penjemputan</div>
-        <div class="topbar-sub">An Nashir Islamic School (SD) · Live</div>
-      </div>
-    </div>
-    
-    <div class="clock-wrapper">
-      <div class="board-date" id="date-display">Senin, 27 Juli 2026</div>
-      <div class="board-clock" id="clock">--:--</div>
-    </div>
-  </div>
-  
-  <div class="board-content" id="board-content"></div>
+<!-- FILTER BAR KELAS -->
+<div class="filter-bar">
+  <button class="filter-btn active" onclick="setFilter('ALL', this)">Semua Kelas</button>
+  <button class="filter-btn" onclick="setFilter('P1', this)">Kelas P1</button>
+  <button class="filter-btn" onclick="setFilter('P2', this)">Kelas P2</button>
+  <button class="filter-btn" onclick="setFilter('P3', this)">Kelas P3</button>
+  <button class="filter-btn" onclick="setFilter('P4', this)">Kelas P4</button>
+  <button class="filter-btn" onclick="setFilter('P5', this)">Kelas P5</button>
+  <button class="filter-btn" onclick="setFilter('P6', this)">Kelas P6</button>
+</div>
+
+<!-- CONTAINER KARTU DIPANGGIL -->
+<div class="grid" id="monitor-grid">
+  <div class="empty-state">Memuat antrean penjemputan…</div>
 </div>
 
 <script type="module">
-import { watchAdminSession, adminLogin, listenQueue, markCalled } from "./firebase-config.js";
+import { listenQueue } from "./firebase-config.js";
 
-let QUEUE = [];
-let unsubQueue = null;
+let currentQueue = [];
+let selectedClassFilter = 'ALL';
 
-window.doLogin = async function doLogin(){
-  const email = document.getElementById('login-email').value.trim();
-  const pass = document.getElementById('login-pass').value;
-  const errEl = document.getElementById('login-error');
-  errEl.textContent='';
-  if(!email || !pass){ errEl.textContent='Email dan kata sandi wajib diisi.'; return; }
-  try{
-    await adminLogin(email, pass);
-  }catch(e){
-    errEl.textContent = 'Email atau kata sandi salah.';
-  }
+// Update Jam & Tanggal
+function updateClock() {
+  const now = new Date();
+  const dateOptions = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+  document.getElementById('date-str').textContent = now.toLocaleDateString('id-ID', dateOptions);
+  
+  const hours = String(now.getHours()).padStart(2, '0');
+  const minutes = String(now.getMinutes()).padStart(2, '0');
+  document.getElementById('time-str').textContent = `${hours}.${minutes}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// Set Filter Kelas
+window.setFilter = function(cls, btn) {
+  selectedClassFilter = cls;
+  document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderQueue();
 }
 
-watchAdminSession((user)=>{
-  const loginWrap = document.getElementById('login-wrap');
-  const boardWrap = document.getElementById('board-wrap');
-  if(user){
-    loginWrap.style.display='none';
-    boardWrap.style.display='block';
-    if(!unsubQueue){
-      unsubQueue = listenQueue((list)=>{ QUEUE = list; renderBoard(); });
-    }
-  } else {
-    loginWrap.style.display='block';
-    boardWrap.style.display='none';
-    if(unsubQueue){ unsubQueue(); unsubQueue=null; }
-  }
+// Listen Antrean Realtime
+listenQueue((data) => {
+  currentQueue = data || [];
+  renderQueue();
 });
 
-function parseTime(val) {
-  if (!val) return 0;
-  if (typeof val === 'number') return val;
-  if (val.toMillis) return val.toMillis();
-  if (val.seconds) return val.seconds * 1000;
-  return new Date(val).getTime() || 0;
-}
-
-function isToday(timestamp) {
-  const t = parseTime(timestamp);
-  if (!t) return false;
-  const d = new Date(t);
-  const now = new Date();
-  return d.getDate() === now.getDate() &&
-         d.getMonth() === now.getMonth() &&
-         d.getFullYear() === now.getFullYear();
-}
-
-function timeAgo(item){
-  const t = parseTime(item.time);
-  if(!t) return 'baru saja';
-  const mins = Math.max(0, Math.floor((Date.now() - t) / 60000));
-  if(mins < 1) return 'baru saja';
-  return `${mins} menit lalu`;
-}
-
-function renderBoard(){
-  const el = document.getElementById('board-content');
+function renderQueue() {
+  const grid = document.getElementById('monitor-grid');
   
-  // 🎯 HANYA TAMPILKAN DATA HARI INI (Otomatis Kosong saat Ganti Hari)
-  const activeQueue = QUEUE.filter(q => {
-    const isTodayData = isToday(q.time) || isToday(q.calledAt);
-    return isTodayData && (q.status === 'waiting' || q.status === 'called' || q.status === 'done');
-  });
+  // Filter berdasarkan kelas yang dipilih
+  let filtered = [...currentQueue];
+  if (selectedClassFilter !== 'ALL') {
+    filtered = filtered.filter(item => String(item.class).toUpperCase().includes(selectedClassFilter));
+  }
 
-  // 🎯 LOGIKA URUTAN:
-  // 1. Status 'waiting' SELALU DI PALING KIRI (#1)
-  // 2. Status 'called' mengikuti setelahnya (yang terbaru dipanggil berada di kiri)
-  activeQueue.sort((a, b) => {
-    const isAWaiting = a.status === 'waiting';
-    const isBWaiting = b.status === 'waiting';
-
-    if (isAWaiting && !isBWaiting) return -1;
-    if (!isAWaiting && isBWaiting) return 1;
-
-    const timeA = parseTime(a.calledAt) || parseTime(a.time);
-    const timeB = parseTime(b.calledAt) || parseTime(b.time);
-    return timeB - timeA;
-  });
-
-  if(activeQueue.length === 0){
-    el.innerHTML = `<div class="board-empty"><b>Papan Kosong</b>Belum ada penjemputan yang aktif hari ini.</div>`;
+  if (filtered.length === 0) {
+    grid.innerHTML = `<div class="empty-state">Tidak ada antrean panggilan ${selectedClassFilter === 'ALL' ? '' : 'untuk Kelas ' + selectedClassFilter}.</div>`;
     return;
   }
 
-  el.innerHTML = `<div class="board-grid">
-    ${activeQueue.map(q => {
-      const isCalled = q.status === 'called' || q.status === 'done';
-      const cardClass = isCalled ? 'called' : 'waiting';
-      
-      // 🎯 TOMBOL SELESAI DIHAPUS. JIKA SUDAH DIPANGGIL, HANYA TAMPIL STATUS FIX.
-      const actionContent = isCalled
-        ? `<div class="status-called-box">✓ Sudah Dipanggil</div>`
-        : `<button class="call-done-btn call-out-btn" onclick="doMarkCalled('${q.id}')">📢 Panggil Keluar</button>`;
-      
-      const statusBadge = isCalled 
-        ? `<span class="called-tag">🔔 DIPANGGIL</span>` 
-        : `<span class="waiting-tag">⏳ MENUNGGU</span>`;
-      
-      return `
-      <div class="call-card ${cardClass}">
-        <div>
-          <div class="call-card-top">
-            ${statusBadge}
-            <span class="class-badge">Kelas ${q.class}</span>
-          </div>
-          <div class="call-name">${q.name}</div>
-          <div class="call-meta">Penjemput: <b>${q.picker || '—'}</b> · ${timeAgo(q)}</div>
+  grid.innerHTML = filtered.map(item => `
+    <div class="card">
+      <div>
+        <div class="card-top">
+          <div class="badge-dipanggil">🔔 DIPANGGIL</div>
+          <div class="badge-kelas">Kelas ${item.class}</div>
         </div>
-        ${actionContent}
-      </div>`;
-    }).join('')}
-  </div>`;
+        <div class="student-name">${item.name}</div>
+        <div class="picker-info">Penjemput: <b>${item.pickerName || 'Orang Tua'}</b> · ${getTimeAgo(item.timestamp)}</div>
+      </div>
+      <div class="btn-action">✓ Sudah Dipanggil</div>
+    </div>
+  `).join('');
 }
 
-window.doMarkCalled = async function doMarkCalled(id){
-  try{
-    const target = QUEUE.find(q => q.id === id);
-    if (target) {
-      target.status = 'called';
-      target.calledAt = Date.now();
-      renderBoard();
-    }
-    await markCalled(id);
-  }catch(e){
-    alert('Gagal menandai dipanggil, coba lagi.');
-  }
+function getTimeAgo(timestamp) {
+  if (!timestamp) return 'baru saja';
+  const seconds = Math.floor((new Date() - new Date(timestamp)) / 1000);
+  if (seconds < 60) return 'baru saja';
+  const minutes = Math.floor(seconds / 60);
+  return `${minutes} menit lalu`;
 }
-
-function tickClock(){
-  const d = new Date();
-  
-  const optionsDate = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
-  const formattedDate = d.toLocaleDateString('id-ID', optionsDate);
-  
-  const hours = String(d.getHours()).padStart(2, '0');
-  const minutes = String(d.getMinutes()).padStart(2, '0');
-  const formattedTime = `${hours}.${minutes}`;
-  
-  const dateEl = document.getElementById('date-display');
-  const clockEl = document.getElementById('clock');
-  
-  if (dateEl) dateEl.textContent = formattedDate;
-  if (clockEl) clockEl.textContent = formattedTime;
-}
-
-setInterval(tickClock, 1000); 
-tickClock();
 </script>
+
 </body>
 </html>
