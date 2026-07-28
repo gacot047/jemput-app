@@ -89,6 +89,36 @@ let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
 let unsubWaiting = null;
 let selectedClassFilter = 'Semua';
+let searchQuery = ''; // Menyimpan state kata kunci pencarian
+
+/* ---------------- NAVIGASI TOMBOL BACK HP / BROWSER ---------------- */
+function openSheetModal() {
+  const overlay = document.getElementById('sheet-overlay');
+  if (!overlay.classList.contains('open')) {
+    overlay.classList.add('open');
+    history.pushState({ sheetOpen: true }, '');
+  }
+}
+
+window.closeSheet = function closeSheet() {
+  const overlay = document.getElementById('sheet-overlay');
+  if (overlay.classList.contains('open')) {
+    overlay.classList.remove('open');
+    if (unsubWaiting) { unsubWaiting(); unsubWaiting = null; }
+    
+    if (history.state && history.state.sheetOpen) {
+      history.back();
+    }
+  }
+}
+
+window.addEventListener('popstate', function (event) {
+  const overlay = document.getElementById('sheet-overlay');
+  if (overlay && overlay.classList.contains('open')) {
+    overlay.classList.remove('open');
+    if (unsubWaiting) { unsubWaiting(); unsubWaiting = null; }
+  }
+});
 
 /* ---------------- FUNGSI BAGIKAN LINK ---------------- */
 window.shareLink = function shareLink() {
@@ -223,7 +253,7 @@ function renderBody(){
 
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
-      <input class="search-input" id="search-input" placeholder="Cari nama anak…" oninput="filterList()">
+      <input class="search-input" id="search-input" value="${searchQuery.replace(/"/g, '&quot;')}" placeholder="Cari nama anak…" oninput="filterList()">
     </div>
     
     <!-- FILTER KELAS -->
@@ -259,9 +289,11 @@ window.selectClassFilter = function selectClassFilter(c){
   renderBody();
 }
 
-function filterList(){
+// Dibuat global agar bisa dipanggil dari HTML input
+window.filterList = function filterList(){
   const searchInput = document.getElementById('search-input');
-  const q = searchInput ? searchInput.value.toLowerCase() : '';
+  searchQuery = searchInput ? searchInput.value : '';
+  const q = searchQuery.toLowerCase().trim();
   
   const filtered = ROSTER.filter(s => {
     const matchName = s.name.toLowerCase().includes(q);
@@ -276,7 +308,7 @@ function renderStudentList(list){
   const el = document.getElementById('student-list');
   if(!el) return;
   if(list.length===0){
-    el.innerHTML = `<div class="empty-state">${ROSTER.length===0 ? 'Memuat daftar siswa…' : 'Tidak ada siswa di kelas ini.'}</div>`;
+    el.innerHTML = `<div class="empty-state">${ROSTER.length===0 ? 'Memuat daftar siswa…' : 'Tidak ada siswa yang cocok dengan pencarian.'}</div>`;
     return;
   }
   el.innerHTML = list.map(s=>{
@@ -322,7 +354,7 @@ window.startSinglePickup = function startSinglePickup(studentId){
   pickerName = '';
 
   renderPinSheet();
-  document.getElementById('sheet-overlay').classList.add('open');
+  openSheetModal();
   setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
 }
 
@@ -361,13 +393,8 @@ window.startMultiPickupProcess = function startMultiPickupProcess(){
   pickerName = '';
   
   renderPinSheet();
-  document.getElementById('sheet-overlay').classList.add('open');
+  openSheetModal();
   setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
-}
-
-window.closeSheet = function closeSheet(){
-  document.getElementById('sheet-overlay').classList.remove('open');
-  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
 }
 
 window.updatePickerName = function updatePickerName(v){
@@ -582,7 +609,7 @@ window.openChangePin = function openChangePin(id){
   cpStudent = ROSTER.find(s=>s.id===id);
   cpStage = 'current'; cpPin = ''; cpVals = { current:'', new:'', confirm:'' };
   renderChangePinSheet();
-  document.getElementById('sheet-overlay').classList.add('open');
+  openSheetModal();
 }
 
 const CP_LABELS = {
