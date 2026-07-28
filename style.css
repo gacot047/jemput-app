@@ -105,7 +105,7 @@ a{color:var(--teal-deep);}
   -webkit-overflow-scrolling: touch;
 }
 .class-filter-wrap::-webkit-scrollbar { display: none; }
-.class-chip {
+.class-chip, .class-filter-btn {
   background: var(--paper-card);
   border: 1px solid var(--line);
   padding: 7px 14px;
@@ -117,10 +117,10 @@ a{color:var(--teal-deep);}
   cursor: pointer;
   transition: all 0.15s ease;
 }
-.class-chip:hover {
+.class-chip:hover, .class-filter-btn:hover {
   background: var(--paper);
 }
-.class-chip.active {
+.class-chip.active, .class-filter-btn.active {
   background: var(--ink);
   color: #ffffff;
   border-color: var(--ink);
@@ -154,10 +154,11 @@ a{color:var(--teal-deep);}
 .student-row{
   display:flex;align-items:center;justify-content:space-between;
   padding:12px 14px;background:var(--paper-card);border:1px solid var(--line);border-radius:14px;
-  cursor:pointer;transition:transform .1s;
+  cursor:pointer;transition:transform .1s, border-color .2s;
 }
 .student-row:active{transform:scale(.98);}
 .student-row.disabled{opacity:.45;cursor:not-allowed;}
+.student-row.selected{border-color:var(--teal);background:#F0FDFA;}
 .student-left{display:flex;align-items:center;gap:11px;}
 .avatar{
   width:36px;height:36px;border-radius:10px;background:var(--amber-soft);color:#A6721B;
@@ -169,6 +170,187 @@ a{color:var(--teal-deep);}
 .chevron{color:var(--slate-light);font-size:15px;}
 .status-tag{font-size:10px;font-weight:700;padding:3px 8px;border-radius:999px;background:var(--amber-soft);color:#A6721B;}
 .empty-state{text-align:center;color:var(--slate-light);font-size:13px;padding:34px 10px;}
+
+/* CHECKBOX UNTUK MODE MULTI-CHILD */
+.checkbox {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+  border: 2px solid var(--line);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.checkbox.checked {
+  background: var(--teal);
+  border-color: var(--teal);
+}
+
+/* ---------- MODE SELECTION BAR & MULTI PICKUP BAR ---------- */
+.mode-selection-bar {
+  margin-bottom: 12px;
+}
+.multi-toggle-btn {
+  width: 100%;
+  padding: 10px 14px;
+  background-color: var(--paper-card);
+  border: 1.5px dashed var(--slate-light);
+  border-radius: 12px;
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+}
+.multi-toggle-btn:hover {
+  background-color: #EDEBE3;
+  border-color: var(--ink);
+}
+.multi-active-banner {
+  background-color: var(--ink);
+  color: #FFFFFF;
+  padding: 10px 14px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  font-weight: 600;
+}
+.btn-cancel-mode {
+  background: rgba(255, 255, 255, 0.2);
+  color: #FFFFFF;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 6px;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* BOTTOM BAR TERAPUNG (MULTI-CHILD) */
+.pickup-bar {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: var(--ink);
+  color: #fff;
+  padding: 14px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+  z-index: 50;
+  animation: slideUp .2s ease;
+}
+.pickup-bar-info {
+  display: flex;
+  flex-direction: column;
+}
+.pickup-bar-count {
+  font-weight: 700;
+  font-size: 14px;
+}
+.pickup-bar-sub {
+  font-size: 11px;
+  color: #AEC3D8;
+}
+.pickup-bar-btn {
+  background: var(--teal);
+  color: #fff;
+  border: none;
+  padding: 10px 18px;
+  border-radius: 10px;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+/* BADGE PROSESS MULTI-STEP PIN */
+.multi-step-badge {
+  display: inline-block;
+  background: var(--amber-soft);
+  color: #A6721B;
+  font-size: 11px;
+  font-weight: 700;
+  padding: 3px 10px;
+  border-radius: 99px;
+  margin-bottom: 6px;
+}
+.picker-info-box {
+  background: var(--paper);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 12.5px;
+  color: var(--slate);
+  margin-top: 8px;
+  text-align: center;
+}
+
+/* ---------- DAFTAR NAMA ANAK DALAM ANTREAN (MODAL) ---------- */
+.queue-child-list {
+  width: 100%;
+  margin: 16px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.queue-child-card {
+  background: #F8FAFC;
+  border: 1.5px solid #E2E8F0;
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  text-align: left;
+  transition: all 0.3s ease;
+}
+.queue-child-name {
+  font-weight: 700;
+  font-size: 13px;
+  color: #0F1C2E;
+}
+.queue-child-class {
+  font-size: 11px;
+  color: #64748B;
+}
+.queue-child-badge {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748B;
+  background: #E2E8F0;
+  padding: 4px 8px;
+  border-radius: 8px;
+}
+.queue-child-card.called {
+  background: #EFF6FF;
+  border-color: #2563EB;
+}
+.queue-child-card.called .queue-child-badge {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+.queue-child-card.completed {
+  background: #F0FDF4;
+  border-color: #16A34A;
+}
+.queue-child-card.completed .queue-child-badge {
+  background: #16A34A;
+  color: #FFFFFF;
+}
 
 /* ---------- SHEET / MODAL ---------- */
 .sheet-overlay{display:none;position:fixed;inset:0;background:rgba(15,28,46,.55);z-index:100;align-items:flex-end;justify-content:center;}
