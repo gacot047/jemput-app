@@ -5,17 +5,25 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Papan Penjemputan — An Nashir Islamic School</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap" rel="stylesheet">
 
 <style>
   :root {
-    --bg-color: #0d1520;
-    --card-bg: #064e3b;
-    --card-border: #10b981;
-    --card-border-waiting: #f59e0b;
+    --bg-color: #0b131e;
+    
+    /* Kartu Menunggu (High Priority) */
+    --card-waiting-bg: linear-gradient(145deg, #1e1b12 0%, #14110b 100%);
+    --card-waiting-border: #f59e0b;
+    --card-waiting-glow: rgba(245, 158, 11, 0.25);
+    
+    /* Kartu Dipanggil (Muted / Low Priority) */
+    --card-called-bg: #111a26;
+    --card-called-border: rgba(16, 185, 129, 0.25);
+    
     --text-main: #ffffff;
-    --text-sub: #a7f3d0;
-    --accent-yellow: #f59e0b;
+    --text-sub: #94a3b8;
+    --accent-yellow: #fbbf24;
+    --accent-green: #10b981;
   }
 
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -34,7 +42,7 @@
   .login-title{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;margin-bottom:4px;}
   .login-sub{font-size:13px;color:#94a3b8;margin-bottom:18px;}
   .login-input{width:100%;padding:11px 13px;margin-top:10px;border:1.5px solid rgba(255,255,255,.15);border-radius:10px;background:rgba(255,255,255,.05);color:#fff;font-size:14px;font-family:inherit;outline:none;}
-  .login-input:focus{border-color:var(--card-border);}
+  .login-input:focus{border-color:var(--accent-green);}
   .login-btn{width:100%;margin-top:16px;padding:12px;border:none;border-radius:10px;background:#10b981;color:#fff;font-weight:700;font-size:14.5px;cursor:pointer;}
   .login-error{color:#f87171;font-size:12.5px;font-weight:600;min-height:16px;margin-top:10px;}
 
@@ -44,48 +52,59 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 20px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 16px 20px;
+    border-radius: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.06);
   }
   .brand { display: flex; align-items: center; gap: 16px; }
-  .logo { width: 50px; height: 50px; object-fit: contain; border-radius:50%; }
-  .title { font-family: 'Space Grotesk', sans-serif; font-size: 28px; font-weight: 700; }
-  .subtitle { font-size: 14px; color: #94a3b8; font-weight: 600; letter-spacing: 1px; }
+  .logo { width: 54px; height: 54px; object-fit: contain; border-radius:50%; }
+  .title { font-family: 'Space Grotesk', sans-serif; font-size: 26px; font-weight: 800; letter-spacing: -0.5px; }
+  .subtitle { font-size: 13px; color: #64748b; font-weight: 700; letter-spacing: 1px; margin-top: 2px; }
 
   .clock-box { text-align: right; }
-  .date-str { font-size: 14px; color: #94a3b8; font-weight: 600; }
-  .time-str { font-family: 'Space Grotesk', sans-serif; font-size: 36px; font-weight: 700; color: var(--accent-yellow); line-height: 1; }
+  .date-str { font-size: 13px; color: #94a3b8; font-weight: 600; margin-bottom: 2px; }
+  .time-str { 
+    font-family: 'Space Grotesk', sans-serif; 
+    font-size: 42px; 
+    font-weight: 800; 
+    color: var(--accent-yellow); 
+    line-height: 1;
+    letter-spacing: -1px;
+  }
 
-  /* FILTER BAR KELAS (Semua, P1 - P6) */
+  /* FILTER BAR KELAS */
   .filter-bar {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     margin-bottom: 24px;
-    background: rgba(255, 255, 255, 0.05);
-    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    padding: 8px;
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.06);
     overflow-x: auto;
   }
   .filter-btn {
     background: transparent;
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #cbd5e1;
-    padding: 8px 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #94a3b8;
+    padding: 8px 18px;
     border-radius: 8px;
-    font-size: 15px;
+    font-size: 14px;
     font-weight: 700;
     cursor: pointer;
     transition: all 0.2s;
     white-space: nowrap;
   }
   .filter-btn:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.08);
     color: #ffffff;
   }
   .filter-btn.active {
-    background: #10b981;
+    background: var(--accent-green);
     color: #ffffff;
-    border-color: #10b981;
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.4);
+    border-color: var(--accent-green);
+    box-shadow: 0 0 14px rgba(16, 185, 129, 0.35);
   }
 
   /* Grid Kartu Monitor */
@@ -95,21 +114,31 @@
     gap: 20px;
   }
 
+  /* KARTU DIPANGGIL (Muted / Selesai) */
   .card {
-    background: linear-gradient(135deg, #064e3b 0%, #022c22 100%);
-    border: 2px solid var(--card-border);
+    background: var(--card-called-bg);
+    border: 1.5px solid var(--card-called-border);
     border-radius: 16px;
     padding: 20px;
-    box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+    box-shadow: 0 4px 15px rgba(0,0,0,0.2);
     display: flex;
     flex-direction: column;
     justify-content: space-between;
     animation: fadeIn 0.3s ease-out;
+    opacity: 0.75;
+    transition: all 0.2s ease;
   }
-  /* Kartu yang BELUM dipanggil keluar: warna amber, bukan hijau */
+  .card:hover {
+    opacity: 0.95;
+  }
+
+  /* KARTU MENUNGGU (High Priority / Glow Accent) */
   .card.waiting {
-    background: linear-gradient(135deg, #3a2a0f 0%, #201404 100%);
-    border-color: var(--card-border-waiting);
+    background: var(--card-waiting-bg);
+    border: 2px solid var(--card-waiting-border);
+    box-shadow: 0 0 20px var(--card-waiting-glow);
+    opacity: 1;
+    animation: pulseGlow 3s infinite alternate, fadeIn 0.3s ease-out;
   }
 
   .card-top {
@@ -118,96 +147,127 @@
     align-items: center;
     margin-bottom: 14px;
   }
+  
+  /* Badges */
   .badge-dipanggil {
-    background: rgba(245, 158, 11, 0.2);
-    color: var(--accent-yellow);
-    border: 1px solid var(--accent-yellow);
+    background: rgba(16, 185, 129, 0.12);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
+    letter-spacing: 0.5px;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 5px;
   }
   .badge-waiting {
-    background: rgba(148, 163, 184, 0.15);
-    color: #cbd5e1;
-    border: 1px solid rgba(148, 163, 184, 0.4);
+    background: rgba(245, 158, 11, 0.18);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.5);
     padding: 4px 10px;
     border-radius: 20px;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 800;
+    letter-spacing: 0.5px;
     display: flex;
     align-items: center;
-    gap: 6px;
-  }
-  .badge-kelas {
-    background: rgba(0,0,0,0.4);
-    color: #ffffff;
-    padding: 4px 12px;
-    border-radius: 8px;
-    font-size: 13px;
-    font-weight: 700;
+    gap: 5px;
   }
 
-  .student-name {
-    font-size: 24px;
+  /* Badge Warna Kelas Spesifik */
+  .badge-kelas {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 12px;
     font-weight: 800;
+    letter-spacing: 0.5px;
+  }
+  .badge-p1 { background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
+  .badge-p2 { background: rgba(249, 115, 22, 0.2); color: #fdba74; border: 1px solid rgba(249, 115, 22, 0.3); }
+  .badge-p3 { background: rgba(234, 179, 8, 0.2); color: #fde047; border: 1px solid rgba(234, 179, 8, 0.3); }
+  .badge-p4 { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+  .badge-p5 { background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+  .badge-p6 { background: rgba(168, 85, 247, 0.2); color: #d8b4fe; border: 1px solid rgba(168, 85, 247, 0.3); }
+  .badge-default { background: rgba(255, 255, 255, 0.1); color: #ffffff; }
+
+  .student-name {
+    font-family: 'Space Grotesk', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
     color: #ffffff;
-    margin-bottom: 8px;
-    line-height: 1.2;
+    margin-bottom: 6px;
+    line-height: 1.25;
+    letter-spacing: -0.3px;
   }
   .picker-info {
-    font-size: 15px;
+    font-size: 14px;
     color: var(--text-sub);
     margin-bottom: 16px;
+  }
+  .picker-info b {
+    color: #e2e8f0;
   }
 
   .btn-action {
     width: 100%;
     border: none;
-    padding: 11px;
-    border-radius: 8px;
-    font-weight: 700;
+    padding: 12px;
+    border-radius: 10px;
+    font-weight: 800;
     font-size: 14px;
     text-align: center;
     cursor: pointer;
     font-family: inherit;
+    transition: all 0.2s ease;
   }
   .btn-call {
-    background: rgba(245, 158, 11, 0.15);
-    border: 1px solid rgba(245, 158, 11, 0.6);
-    color: var(--accent-yellow);
+    background: #f59e0b;
+    color: #0d1520;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.3);
   }
-  .btn-call:hover { background: rgba(245, 158, 11, 0.28); }
-  .btn-done {
-    background: rgba(0, 0, 0, 0.3);
-    border: 1px solid rgba(16, 185, 129, 0.5);
-    color: #a7f3d0;
+  .btn-call:hover { 
+    background: #d97706; 
+    box-shadow: 0 4px 16px rgba(245, 158, 11, 0.45);
+    transform: translateY(-1px);
   }
-  .btn-done:hover { background: rgba(16, 185, 129, 0.2); }
-  .done-caption {
+
+  /* Ringkasan Status Dipanggil */
+  .done-status-box {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    background: rgba(16, 185, 129, 0.08);
+    border: 1px solid rgba(16, 185, 129, 0.2);
+    border-radius: 8px;
+    padding: 8px;
     font-size: 12.5px;
-    color: #6ee7b7;
-    font-weight: 600;
-    text-align: center;
-    padding: 8px 4px;
-    opacity: 0.85;
+    color: #34d399;
+    font-weight: 700;
   }
 
   .empty-state {
     grid-column: 1 / -1;
     text-align: center;
-    padding: 60px;
-    color: #64748b;
+    padding: 80px 20px;
+    color: #475569;
     font-size: 18px;
     font-weight: 600;
+    background: rgba(255, 255, 255, 0.02);
+    border-radius: 16px;
+    border: 1px dashed rgba(255, 255, 255, 0.06);
   }
 
   @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(20px); }
+    from { opacity: 0; transform: translateY(12px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+
+  @keyframes pulseGlow {
+    from { box-shadow: 0 0 12px rgba(245, 158, 11, 0.2); }
+    to { box-shadow: 0 0 24px rgba(245, 158, 11, 0.45); }
   }
 </style>
 </head>
@@ -316,6 +376,19 @@ window.setFilter = function(cls, btn) {
   renderQueue();
 }
 
+/* ---------------- HELPER STYLING BADGE KELAS ---------------- */
+function getClassBadgeClass(classStr) {
+  if (!classStr) return 'badge-default';
+  const c = String(classStr).toUpperCase();
+  if (c.includes('P1')) return 'badge-p1';
+  if (c.includes('P2')) return 'badge-p2';
+  if (c.includes('P3')) return 'badge-p3';
+  if (c.includes('P4')) return 'badge-p4';
+  if (c.includes('P5')) return 'badge-p5';
+  if (c.includes('P6')) return 'badge-p6';
+  return 'badge-default';
+}
+
 /* ---------------- RENDER PAPAN ---------------- */
 function renderQueue() {
   const grid = document.getElementById('monitor-grid');
@@ -334,20 +407,21 @@ function renderQueue() {
 
   grid.innerHTML = filtered.map(item => {
     const called = item.status === 'called';
+    const classBadgeStyle = getClassBadgeClass(item.class);
     return `
     <div class="card ${called ? '' : 'waiting'}">
       <div>
         <div class="card-top">
           ${called
-            ? `<div class="badge-dipanggil">🔔 DIPANGGIL</div>`
-            : `<div class="badge-waiting">⏳ MENUNGGU</div>`}
-          <div class="badge-kelas">Kelas ${item.class}</div>
+            ? `<div class="badge-dipanggil"><span>✓</span> DIPANGGIL</div>`
+            : `<div class="badge-waiting"><span>⏳</span> MENUNGGU</div>`}
+          <div class="badge-kelas ${classBadgeStyle}">Kelas ${item.class}</div>
         </div>
         <div class="student-name">${item.name}</div>
         <div class="picker-info">Penjemput: <b>${item.picker || 'Orang Tua'}</b> · ${getTimeAgo(item.time)}</div>
       </div>
       ${called
-        ? `<div class="done-caption">✓ Selesai dipanggil — akan tersimpan hingga papan direset tengah malam</div>`
+        ? `<div class="done-status-box">✓ Sudah Dipanggil</div>`
         : `<button class="btn-action btn-call" onclick="doMarkCalled('${item.id}')">📢 Panggil Keluar</button>`}
     </div>
   `;
