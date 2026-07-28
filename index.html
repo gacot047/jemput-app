@@ -24,6 +24,7 @@
 
 <div class="page-wrap">
 
+  <!-- BAR GPS / LOKASI TERDETEKSI -->
   <div class="geo-pill" id="geo-pill">
     <div class="geo-dot" id="geo-dot"></div>
     <div>
@@ -32,6 +33,16 @@
     </div>
     <button class="geo-retry" id="geo-retry" style="display:none;" onclick="checkLocation()">Coba lagi</button>
   </div>
+
+  <!-- TOMBOL BAGIKAN LINK -->
+  <button class="share-btn" onclick="shareLink()">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
+      <polyline points="16 6 12 2 8 6"></polyline>
+      <line x1="12" y1="2" x2="12" y2="15"></line>
+    </svg>
+    <span>Bagikan Link Penjemputan</span>
+  </button>
 
   <div id="body-content">
     <div class="empty-state">Memuat…</div>
@@ -64,14 +75,27 @@ let cpStage = 'current'; // 'current' | 'new' | 'confirm'
 let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
 let unsubWaiting = null; // listener aktif untuk layar status "menunggu dipanggil"
+let selectedClassFilter = 'Semua'; // Filter kelas aktif
 
-/* ---------------- SUARA NOTIFIKASI (dibuat langsung, tanpa file audio) ---------------- */
+/* ---------------- FUNGSI BAGIKAN LINK ---------------- */
+window.shareLink = function shareLink() {
+  const shareData = {
+    title: 'Jemput — An Nashir Islamic School',
+    text: 'Akses link penjemputan siswa An Nashir Islamic School:',
+    url: window.location.href
+  };
+
+  if (navigator.share) {
+    navigator.share(shareData).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(window.location.href);
+    alert('Link penjemputan berhasil disalin!');
+  }
+};
+
+/* ---------------- SUARA NOTIFIKASI ---------------- */
 let notifAudioCtx = null;
 function warmUpAudio(){
-  // Dipanggil saat orang tua mengetuk keypad (aksi sentuh sungguhan) supaya
-  // browser mengizinkan bunyi diputar nanti walau tanpa ketukan baru —
-  // beberapa browser (terutama iPhone) mewajibkan audio "dinyalakan" lewat
-  // interaksi pengguna dulu sebelum bisa diputar otomatis di kemudian hari.
   if(!notifAudioCtx){
     try{ notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
     catch(e){ notifAudioCtx = null; }
@@ -115,10 +139,6 @@ window.checkLocation = function checkLocation(){
     return;
   }
 
-  // GPS di HP butuh beberapa detik untuk menyempurnakan akurasinya.
-  // Alih-alih memakai bacaan pertama (yang sering meleset jauh), kita
-  // dengarkan beberapa bacaan selama beberapa detik dan pakai yang
-  // paling akurat (nilai `accuracy` paling kecil).
   let best = null;
   let watchId = null;
   let finished = false;
@@ -147,7 +167,7 @@ window.checkLocation = function checkLocation(){
         best = pos.coords;
       }
       if(pos.coords.accuracy <= 30){
-        finish(); // sudah cukup akurat, tidak perlu menunggu lebih lama
+        finish();
       }
     },
     (err)=>{
@@ -156,7 +176,7 @@ window.checkLocation = function checkLocation(){
     { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
   );
 
-  setTimeout(finish, 6000); // batas atas menunggu, pakai bacaan terbaik yang ada
+  setTimeout(finish, 6000);
 }
 checkLocation();
 
@@ -166,11 +186,23 @@ listenQueue((list)=>{ QUEUE = list; renderBody(); });
 
 function renderBody(){
   const el = document.getElementById('body-content');
+  const classes = ['Semua', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+
   el.innerHTML = `
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
       <input class="search-input" id="search-input" placeholder="Cari nama anak…" oninput="filterList()">
     </div>
+    
+    <!-- FILTER KELAS -->
+    <div class="class-filter-wrap">
+      ${classes.map(c => `
+        <button class="class-filter-btn ${selectedClassFilter === c ? 'active' : ''}" onclick="selectClassFilter('${c}')">
+          ${c}
+        </button>
+      `).join('')}
+    </div>
+
     ${mode === 'gantipin' ? `
       <div class="mode-banner">
         <span>🔑 Mode Ganti PIN aktif — pilih nama anak untuk mengganti PIN keluarganya</span>
@@ -183,17 +215,33 @@ function renderBody(){
     </div>
     <div class="student-list" id="student-list"></div>
   `;
-  renderStudentList(ROSTER);
+  filterList();
   document.getElementById('search-input').oninput = filterList;
 }
+
+window.selectClassFilter = function selectClassFilter(c){
+  selectedClassFilter = c;
+  renderBody();
+}
+
 window.toggleChangePinMode = function toggleChangePinMode(){
   mode = mode === 'jemput' ? 'gantipin' : 'jemput';
   renderBody();
 }
+
 function filterList(){
-  const q = document.getElementById('search-input').value.toLowerCase();
-  renderStudentList(ROSTER.filter(s => s.name.toLowerCase().includes(q)));
+  const searchInput = document.getElementById('search-input');
+  const q = searchInput ? searchInput.value.toLowerCase() : '';
+  
+  const filtered = ROSTER.filter(s => {
+    const matchName = s.name.toLowerCase().includes(q);
+    const matchClass = selectedClassFilter === 'Semua' || String(s.class).trim().toUpperCase() === selectedClassFilter.toUpperCase();
+    return matchName && matchClass;
+  });
+
+  renderStudentList(filtered);
 }
+
 function renderStudentList(list){
   const el = document.getElementById('student-list');
   if(!el) return;
@@ -307,7 +355,7 @@ async function checkPin(){
 
   const messages = {
     wrong_pin: `PIN salah. ${result.attemptsLeft!=null ? `Percobaan tersisa: ${result.attemptsLeft}.` : ''}`,
-    locked: null, // shown as lockout box below
+    locked: null,
     out_of_range: null,
     already_queued: 'Siswa ini sudah masuk antrean penjemputan.',
   };
@@ -337,7 +385,6 @@ function showWaitingScreen(queueId){
 
   unsubWaiting = listenQueueEntry(queueId, (entry)=>{
     if(!entry){
-      // Dokumen sudah dihapus guru = anak sudah selesai diserahkan
       c.innerHTML = `
         <div class="success-wrap">
           <div class="success-icon">🎉</div>
@@ -432,7 +479,6 @@ async function cpAdvance(){
     renderChangePinSheet();
     return;
   }
-  // stage === 'confirm'
   cpVals.confirm = cpPin;
   if(cpVals.new !== cpVals.confirm){
     cpPin = ''; cpStage = 'new';
