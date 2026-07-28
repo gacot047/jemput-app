@@ -201,10 +201,14 @@
     line-height: 1.25;
     letter-spacing: -0.3px;
   }
+  
   .picker-info {
     font-size: 14px;
     color: var(--text-sub);
     margin-bottom: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
   .picker-info b {
     color: #e2e8f0;
@@ -293,7 +297,7 @@
       <img src="logo.png" alt="Logo" class="logo">
       <div>
         <div class="title">Papan Penjemputan</div>
-        <div class="subtitle">AN NASHIR ISLAMIC SCHOOL (Primary) · LIVE</div>
+        <div class="subtitle">AN NASHIR ISLAMIC SCHOOL (SD) · LIVE</div>
       </div>
     </div>
     <div class="clock-box">
@@ -418,7 +422,10 @@ function renderQueue() {
           <div class="badge-kelas ${classBadgeStyle}">Kelas ${item.class}</div>
         </div>
         <div class="student-name">${item.name}</div>
-        <div class="picker-info">Penjemput: <b>${item.picker || 'Orang Tua'}</b> · ${getTimeAgo(item.time)}</div>
+        <div class="picker-info">
+          <span>Penjemput: <b>${item.picker || 'Orang Tua'}</b></span>
+          <span>${getTimeAgo(item.time)}</span>
+        </div>
       </div>
       ${called
         ? `<div class="done-status-box">✓ Sudah Dipanggil</div>`
