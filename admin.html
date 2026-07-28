@@ -68,7 +68,7 @@
 
     <div class="admin-card">
       <div class="admin-title">Daftar Siswa</div>
-      <div class="admin-sub">Klik kotak PIN untuk mengubahnya. Perubahan tersimpan otomatis.</div>
+      <div class="admin-sub">Klik tombol Ubah PIN untuk memperbarui. Perubahan tersimpan otomatis.</div>
       <div id="admin-list"><div class="admin-empty">Memuat…</div></div>
     </div>
 
@@ -105,9 +105,11 @@ window.doLogin = async function doLogin(){
     errEl.textContent = 'Email atau kata sandi salah.';
   }
 }
+
 window.doLogout = async function doLogout(){
   await adminLogout();
 }
+
 window.doResetPassword = async function doResetPassword(){
   const email = document.getElementById('login-email').value.trim();
   const errEl = document.getElementById('login-error');
@@ -121,6 +123,7 @@ window.doResetPassword = async function doResetPassword(){
     errEl.textContent='Gagal mengirim link reset. Periksa alamat email.';
   }
 }
+
 window.doResetPasswordLoggedIn = async function doResetPasswordLoggedIn(){
   const toast = document.getElementById('account-toast');
   try{
@@ -166,27 +169,36 @@ function renderAdminList(){
     return `
       <div class="admin-class-group">
         <div class="admin-class-heading">Kelas ${cls}</div>
-        ${students.map(s=>`
+        ${students.map(s=>{
+          // Amankan nama dari tanda petik tunggal maupun ganda agar atribut onclick tidak terputus
+          const safeName = s.name.replace(/'/g, "\\'").replace(/"/g, '&quot;');
+          return `
           <div class="admin-row">
             <div class="admin-row-name">${s.name}</div>
             <div class="admin-row-actions">
-              <div class="pin-badge" onclick="doEditPin('${s.id}','${s.name.replace(/'/g,"\\'")}')" title="Klik untuk ubah PIN">Ubah PIN</div>
-              <button class="icon-btn" onclick="doDeleteStudent('${s.id}','${s.name.replace(/'/g,"\\'")}')" title="Hapus">✕</button>
+              <div class="pin-badge" onclick="doEditPin('${s.id}','${safeName}')" title="Klik untuk ubah PIN">Ubah PIN</div>
+              <button class="icon-btn" onclick="doDeleteStudent('${s.id}','${safeName}')" title="Hapus">✕</button>
             </div>
-          </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>`;
   }).join('');
 }
 
 /* ---------------- CRUD ---------------- */
 window.doAddStudent = async function doAddStudent(){
-  const name = document.getElementById('new-name').value.trim();
+  const rawName = document.getElementById('new-name').value.trim();
+  // Bersihkan karakter " (double quote) dari input nama secara otomatis
+  const name = rawName.replace(/"/g, '').trim(); 
+  
   const cls = document.getElementById('new-class').value;
   const pinVal = document.getElementById('new-pin').value.trim();
   const toast = document.getElementById('add-toast');
   const btn = document.getElementById('add-btn');
+
   if(!name){ toast.className='toast err'; toast.textContent='Nama siswa wajib diisi.'; return; }
   if(!/^\d{4}$/.test(pinVal)){ toast.className='toast err'; toast.textContent='PIN harus 4 digit angka.'; return; }
+  
   btn.disabled = true; btn.textContent='Menyimpan…';
   try{
     await addStudent(name, cls, pinVal);
@@ -200,6 +212,7 @@ window.doAddStudent = async function doAddStudent(){
   }
   btn.disabled=false; btn.textContent='+ Tambah';
 }
+
 window.doEditPin = async function doEditPin(id, name){
   const newPin = prompt(`PIN baru untuk ${name} (4 digit):`);
   if(newPin===null) return;
@@ -210,6 +223,7 @@ window.doEditPin = async function doEditPin(id, name){
     alert('Gagal mengubah PIN, coba lagi.');
   }
 }
+
 window.doDeleteStudent = async function doDeleteStudent(id, name){
   if(!confirm(`Hapus ${name} dari daftar siswa?`)) return;
   try{
