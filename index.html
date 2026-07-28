@@ -253,7 +253,7 @@ function renderBody(){
 
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
-      <input class="search-input" id="search-input" value="${searchQuery.replace(/"/g, '&quot;')}" placeholder="Cari nama anak…" oninput="filterList()">
+      <input class="search-input" id="search-input" value="${searchQuery.replace(/"/g, '&quot;')}" placeholder="Cari nama anak (depan, tengah, belakang)..." oninput="filterList()">
     </div>
     
     <!-- FILTER KELAS -->
@@ -289,15 +289,21 @@ window.selectClassFilter = function selectClassFilter(c){
   renderBody();
 }
 
-// Dibuat global agar bisa dipanggil dari HTML input
+/* ---------------- LOGIKA PENCARIAN FLEKSIBEL (NAMA DEPAN/TENGAH/BELAKANG) ---------------- */
 window.filterList = function filterList(){
   const searchInput = document.getElementById('search-input');
   searchQuery = searchInput ? searchInput.value : '';
-  const q = searchQuery.toLowerCase().trim();
+  
+  // Pecah kata kunci pencarian menjadi bagian-bagian kata (misal: "budi pratama" -> ["budi", "pratama"])
+  const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/).filter(t => t.length > 0);
   
   const filtered = ROSTER.filter(s => {
-    const matchName = s.name.toLowerCase().includes(q);
+    const studentName = s.name.toLowerCase();
+    
+    // Semua kata yang diketik harus ditemukan di dalam nama siswa (di posisi mana saja)
+    const matchName = searchTerms.every(term => studentName.includes(term));
     const matchClass = selectedClassFilter === 'Semua' || String(s.class).trim().toUpperCase() === selectedClassFilter.toUpperCase();
+    
     return matchName && matchClass;
   });
 
@@ -308,7 +314,7 @@ function renderStudentList(list){
   const el = document.getElementById('student-list');
   if(!el) return;
   if(list.length===0){
-    el.innerHTML = `<div class="empty-state">${ROSTER.length===0 ? 'Memuat daftar siswa…' : 'Tidak ada siswa yang cocok dengan pencarian.'}</div>`;
+    el.innerHTML = `<div class="empty-state">${ROSTER.length===0 ? 'Memuat daftar siswa…' : 'Tidak ada nama siswa yang cocok.'}</div>`;
     return;
   }
   el.innerHTML = list.map(s=>{
