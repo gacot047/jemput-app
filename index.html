@@ -19,122 +19,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-
-<style>
-  /* 1. Pengoptimalan Kotak Geolocation (Status Lokasi) */
-  .geo-pill {
-    background: #f0f4f9 !important;
-    border: 1px dashed #cbd5e1 !important;
-    box-shadow: none !important;
-  }
-
-  /* 2. Warna Status Badge 'Sudah Dipanggil' */
-  .status-tag {
-    background-color: #e2e8f0 !important;
-    color: #475569 !important;
-    font-weight: 700 !important;
-    border: 1px solid #cbd5e1 !important;
-  }
-
-  /* 3. Penyesuaian Tombol Lupa / Ganti PIN */
-  .link-btn {
-    background: #e0f2fe;
-    color: #0369a1;
-    padding: 6px 12px;
-    border-radius: 20px;
-    font-weight: 600;
-    font-size: 13px;
-    border: none;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .link-btn:active {
-    transform: scale(0.95);
-  }
-
-  /* 4. Filter Bar Kelas P1 - P6 */
-  .class-filter-wrap {
-    display: flex;
-    gap: 8px;
-    overflow-x: auto;
-    padding-bottom: 8px;
-    margin-bottom: 12px;
-    scrollbar-width: none;
-  }
-  .class-filter-wrap::-webkit-scrollbar {
-    display: none;
-  }
-  .filter-chip {
-    background: #ffffff;
-    border: 1px solid #e2e8f0;
-    padding: 6px 14px;
-    border-radius: 16px;
-    font-size: 13px;
-    font-weight: 600;
-    color: #64748b;
-    white-space: nowrap;
-    cursor: pointer;
-    transition: all 0.2s;
-  }
-  .filter-chip.active {
-    background: #0F1C2E;
-    color: #ffffff;
-    border-color: #0F1C2E;
-  }
-
-  /* 5. Avatar & Skeleton Loader UI */
-  .avatar {
-    color: #ffffff !important;
-    font-weight: 700;
-  }
-
-  .skeleton-row {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 12px;
-    background: #ffffff;
-    border-radius: 12px;
-    margin-bottom: 8px;
-  }
-  .skeleton-avatar {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: #e2e8f0;
-    animation: pulse 1.5s infinite ease-in-out;
-  }
-  .skeleton-text-group {
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    flex: 1;
-  }
-  .skeleton-line {
-    height: 12px;
-    border-radius: 6px;
-    background: #e2e8f0;
-    animation: pulse 1.5s infinite ease-in-out;
-  }
-  .skeleton-line.short { width: 40%; }
-  .skeleton-line.long { width: 75%; }
-
-  @keyframes pulse {
-    0% { opacity: 0.6; }
-    50% { opacity: 1; }
-    100% { opacity: 0.6; }
-  }
-
-  /* Animasi Pop Tampilan saat Dipanggil */
-  @keyframes popNotice {
-    0% { transform: scale(0.9); opacity: 0; }
-    50% { transform: scale(1.03); }
-    100% { transform: scale(1); opacity: 1; }
-  }
-  .called-pop {
-    animation: popNotice 0.4s ease-out forwards;
-  }
-</style>
 </head>
 <body>
 
@@ -150,6 +34,7 @@
 
 <div class="page-wrap">
 
+  <!-- Status Lokasi GPS -->
   <div class="geo-pill" id="geo-pill">
     <div class="geo-dot" id="geo-dot"></div>
     <div>
@@ -159,13 +44,18 @@
     <button class="geo-retry" id="geo-retry" style="display:none;" onclick="checkLocation()">Coba lagi</button>
   </div>
 
+  <!-- Tombol Bagikan Tautan Penjemputan -->
+  <button class="share-btn" onclick="sharePickupLink()">
+    <span>📲 Bagikan Tautan Penjemputan</span>
+  </button>
+
   <div id="body-content">
-    <div class="empty-state">Memuat…</div>
+    <div class="empty-state">Memuat data…</div>
   </div>
 
 </div>
 
-<!-- PIN SHEET -->
+<!-- PIN SHEET MODAL -->
 <div class="sheet-overlay" id="sheet-overlay">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -182,31 +72,53 @@ let coords = null;
 let selectedStudent = null;
 let pin = '';
 let pickerName = '';
-let attempts = 0;
-const MAX_ATTEMPTS = 3;
 let mode = 'jemput'; // 'jemput' | 'gantipin'
-let selectedClassFilter = 'ALL'; // Filter kelas 'ALL' | 'P1' | 'P2' ...
+let selectedClassFilter = 'ALL'; // 'ALL' | 'P1' | 'P2' ...
 let cpStudent = null;
 let cpStage = 'current'; // 'current' | 'new' | 'confirm'
 let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
 let unsubWaiting = null;
 
-// Fungsi Penghasil Suara Bel Notifikasi Nyaring (Tiga Nada Cepat F5 - A5 - C6)
+// Fungsi Bagikan Tautan Penjemputan
+window.sharePickupLink = async function sharePickupLink() {
+  const shareData = {
+    title: 'Aplikasi Penjemputan An Nashir',
+    text: 'Tautan Penjemputan Siswa An Nashir Islamic School:',
+    url: window.location.origin + window.location.pathname
+  };
+
+  if (navigator.share) {
+    try {
+      await navigator.share(shareData);
+    } catch (err) {
+      if (err.name !== 'AbortError') console.error('Gagal membagikan:', err);
+    }
+  } else {
+    try {
+      await navigator.clipboard.writeText(shareData.url);
+      alert('Tautan penjemputan berhasil disalin ke clipboard!');
+    } catch (err) {
+      alert('Gagal menyalin tautan.');
+    }
+  }
+};
+
+// Fungsi Suara Bel Notifikasi (Tiga Nada Cepat F5 - A5 - C6)
 function playChime() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [698.46, 880.00, 1046.50]; // Nada F5, A5, C6 (Nyaring & Kontras)
+    const notes = [698.46, 880.00, 1046.50];
     
     notes.forEach((freq, index) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       const startTime = ctx.currentTime + (index * 0.12);
       
-      osc.type = 'triangle'; // Gelombang triangle lebih tegas & krispi
+      osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, startTime);
       
-      gain.gain.setValueAtTime(0.6, startTime); // Volume lebih keras
+      gain.gain.setValueAtTime(0.6, startTime);
       gain.gain.exponentialRampToValueAtTime(0.00001, startTime + 0.35);
       
       osc.connect(gain);
@@ -220,7 +132,7 @@ function playChime() {
   }
 }
 
-// Warna Pastel untuk Avatar Inisial
+// Warna Pastel Avatar Inisial
 const AVATAR_COLORS = [
   '#2563eb', '#7c3aed', '#db2777', '#ea580c', 
   '#059669', '#0891b2', '#4f46e5', '#d97706'
@@ -297,7 +209,7 @@ window.checkLocation = function checkLocation(){
 }
 checkLocation();
 
-/* ---------------- ROSTER + QUEUE (real-time) ---------------- */
+/* ---------------- ROSTER + QUEUE ---------------- */
 listenRoster((list)=>{ ROSTER = list; renderBody(); });
 listenQueue((list)=>{ QUEUE = list; renderBody(); });
 
@@ -412,18 +324,21 @@ function renderStudentList(list){
 window.openPin = function openPin(id){
   if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
   selectedStudent = ROSTER.find(s=>s.id===id);
-  pin=''; attempts=0; pickerName='';
+  pin=''; pickerName='';
   renderPinSheet();
   document.getElementById('sheet-overlay').classList.add('open');
   setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
 }
+
 window.closeSheet = function closeSheet(){
   document.getElementById('sheet-overlay').classList.remove('open');
   if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
 }
+
 window.updatePickerName = function updatePickerName(v){
   pickerName = v;
 }
+
 function renderPinSheet(pinErr, nameErr){
   const c = document.getElementById('sheet-content');
   const safeName = pickerName.replace(/"/g,'&quot;');
@@ -448,6 +363,7 @@ function renderPinSheet(pinErr, nameErr){
     </div>
   `;
 }
+
 window.pressKey = function pressKey(n){
   if(!pickerName.trim()){
     renderPinSheet('', 'Isi nama penjemput dulu sebelum memasukkan PIN.');
@@ -459,10 +375,12 @@ window.pressKey = function pressKey(n){
   renderPinSheet();
   if(pin.length===4) checkPin();
 }
+
 window.backspace = function backspace(){
   pin = pin.slice(0,-1);
   renderPinSheet();
 }
+
 async function checkPin(){
   if(!pickerName.trim()){
     pin='';
@@ -538,11 +456,10 @@ function showWaitingScreen(queueId){
       return;
     }
 
-    // Bunyikan Suara Bel Nyaring + Getar Saat Status Berubah Menjadi 'called'
     if(entry.status === 'called' && lastStatus !== 'called'){
-      playChime(); // Suara Bel untuk iOS/iPhone & Android
+      playChime();
       if(navigator.vibrate){
-        navigator.vibrate([250,120,250,120,250]); // Getar Khusus Android
+        navigator.vibrate([250,120,250,120,250]);
       }
     }
     lastStatus = entry.status;
@@ -577,11 +494,13 @@ window.openChangePin = function openChangePin(id){
   renderChangePinSheet();
   document.getElementById('sheet-overlay').classList.add('open');
 }
+
 const CP_LABELS = {
   current: { title: 'Verifikasi PIN Lama', sub: (n)=>`Masukkan PIN keluarga yang berlaku saat ini untuk ${n}` },
   new:     { title: 'Buat PIN Baru',       sub: ()=>'Masukkan PIN baru (4 digit)' },
   confirm: { title: 'Konfirmasi PIN Baru', sub: ()=>'Ulangi sekali lagi PIN baru untuk konfirmasi' },
 };
+
 function renderChangePinSheet(err){
   const c = document.getElementById('sheet-content');
   const { title, sub } = CP_LABELS[cpStage];
@@ -600,16 +519,19 @@ function renderChangePinSheet(err){
     </div>
   `;
 }
+
 window.cpPressKey = function cpPressKey(n){
   if(cpPin.length>=4) return;
   cpPin += n;
   renderChangePinSheet();
   if(cpPin.length===4) cpAdvance();
 }
+
 window.cpBackspace = function cpBackspace(){
   cpPin = cpPin.slice(0,-1);
   renderChangePinSheet();
 }
+
 async function cpAdvance(){
   if(cpStage === 'current'){
     cpVals.current = cpPin; cpPin = ''; cpStage = 'new';
