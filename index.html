@@ -9,155 +9,761 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=2.0">
+
 <style>
-.class-filter-wrap{display:flex!important;flex-wrap:nowrap!important;gap:4px!important;overflow-x:visible!important;width:100%!important}
-.class-filter-btn{flex:1 1 0px!important;padding:6px 2px!important;font-size:11px!important;min-width:0!important;text-align:center!important}
+  /* Penyesuaian tombol filter kelas agar muat 1 layar tanpa scroll */
+  .class-filter-wrap {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    overflow-x: visible !important;
+    width: 100% !important;
+  }
+  .class-filter-btn {
+    flex: 1 1 0px !important;
+    padding: 6px 2px !important;
+    font-size: 11px !important;
+    min-width: 0 !important;
+    text-align: center !important;
+  }
 </style>
 </head>
 <body>
+
 <div class="topbar">
   <div class="topbar-brand">
     <div class="topbar-logo"><img src="logo.png" alt="Logo An Nashir Islamic School"></div>
-    <div><div class="topbar-name">Aplikasi Penjemputan</div><div class="topbar-sub">An Nashir Islamic School (Primary)</div></div>
+    <div>
+      <div class="topbar-name">Aplikasi Penjemputan</div>
+      <div class="topbar-sub">An Nashir Islamic School (Primary)</div>
+    </div>
   </div>
 </div>
 
 <div class="page-wrap">
+
+  <!-- BAR GPS / LOKASI TERDETEKSI -->
   <div class="geo-pill" id="geo-pill">
     <div class="geo-dot" id="geo-dot"></div>
-    <div><div class="geo-label" id="geo-label">Mengecek lokasi…</div><div class="geo-sub" id="geo-sub">Aktifkan izin lokasi di browser Anda</div></div>
+    <div>
+      <div class="geo-label" id="geo-label">Mengecek lokasi…</div>
+      <div class="geo-sub" id="geo-sub">Aktifkan izin lokasi di browser Anda</div>
+    </div>
     <button class="geo-retry" id="geo-retry" style="display:none;" onclick="checkLocation()">Coba lagi</button>
   </div>
 
+  <!-- TOMBOL BAGIKAN LINK -->
   <button class="share-btn" onclick="shareLink()">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
       <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"></path>
-      <polyline points="16 6 12 2 8 6"></polyline><line x1="12" y1="2" x2="12" y2="15"></line>
-    </svg><span>Bagikan Link Penjemputan</span>
+      <polyline points="16 6 12 2 8 6"></polyline>
+      <line x1="12" y1="2" x2="12" y2="15"></line>
+    </svg>
+    <span>Bagikan Link Penjemputan</span>
   </button>
 
-  <div id="body-content"><div class="empty-state">Memuat daftar siswa…</div></div>
+  <div id="body-content">
+    <div class="empty-state">Memuat…</div>
+  </div>
+
 </div>
 
-<div class="pickup-bar" id="pickup-bar" style="display:none;">
-  <div class="pickup-bar-info"><span class="pickup-bar-count" id="pickup-bar-count">0 Anak Terpilih</span><span class="pickup-bar-sub">Ketuk untuk memasukkan PIN penjemputan</span></div>
+<!-- BOTTOM BAR UNTUK MODE MULTI-CHILD -->
+<div class="pickup-bar" id="pickup-bar" style="display: none;">
+  <div class="pickup-bar-info">
+    <span class="pickup-bar-count" id="pickup-bar-count">0 Anak Terpilih</span>
+    <span class="pickup-bar-sub">Ketuk untuk memasukkan PIN penjemputan</span>
+  </div>
   <button class="pickup-bar-btn" onclick="startMultiPickupProcess()">Lanjut Penjemputan ›</button>
 </div>
 
-<div class="sheet-overlay" id="sheet-overlay"><div class="sheet"><div class="sheet-handle"></div><div id="sheet-content"></div></div></div>
+<!-- SHEET PIN / DIALOG -->
+<div class="sheet-overlay" id="sheet-overlay">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div id="sheet-content"></div>
+  </div>
+</div>
 
 <script type="module">
-import { getRosterOnce, submitPickup, changeFamilyPin, listenQueueEntry } from "./firebase-config.js";
+import { listenRoster, listenQueue, submitPickup, changeFamilyPin, listenQueueEntry } from "./firebase-config.js";
 
-let ROSTER=[];
-let coords=null;
-let mode='single';
-let selectedStudentIds=[];
-let currentMultiIndex=0;
-let verifiedPickups=[];
-let pin='';
-let pickerName='';
-let cpStudent=null;
-let cpStage='current';
-let cpPin='';
-let cpVals={current:'',new:'',confirm:''};
-let unsubWaiting=[];
-let selectedClassFilter='Semua';
-let searchQuery='';
-let rosterLoaded=false;
+let ROSTER = [];
+let QUEUE = [];
+let coords = null;
 
-const AVATAR_COLORS=['#4F46E5','#7C3AED','#EC4899','#F59E0B','#10B981','#3B82F6','#06B6D4','#8B5CF6','#D97706','#059669','#E11D48','#0284C7','#7E22CE','#B45309','#0D9488'];
-function getAvatarBg(name){let hash=0;for(let i=0;i<name.length;i++)hash=name.charCodeAt(i)+((hash<<5)-hash);return AVATAR_COLORS[Math.abs(hash)%AVATAR_COLORS.length]}
+/* Mode Operasi: 'single' | 'multi' | 'gantipin' */
+let mode = 'single'; 
 
-/* ==================== NAVIGASI ==================== */
-function openSheetModal(){const overlay=document.getElementById('sheet-overlay');if(!overlay.classList.contains('open')){overlay.classList.add('open');history.pushState({sheetOpen:true},'')}}
-window.closeSheet=function(){const overlay=document.getElementById('sheet-overlay');if(overlay.classList.contains('open')){overlay.classList.remove('open');stopAllWaitingListeners();if(history.state&&history.state.sheetOpen)history.back()}}
-window.addEventListener('popstate',()=>{const overlay=document.getElementById('sheet-overlay');if(overlay&&overlay.classList.contains('open')){overlay.classList.remove('open');stopAllWaitingListeners()}});
+let selectedStudentIds = []; // ID siswa terpilih untuk mode multi
+let currentMultiIndex = 0;    // Urutan penjemputan multi-anak
+let verifiedPickups = [];
 
-/* ==================== SHARE ==================== */
-window.shareLink=function(){const shareData={title:'Jemput — An Nashir Islamic School',text:'Akses link penjemputan siswa An Nashir Islamic School:',url:window.location.href};if(navigator.share)navigator.share(shareData).catch(()=>{});else navigator.clipboard.writeText(window.location.href).then(()=>alert('Link penjemputan berhasil disalin!')).catch(()=>alert(window.location.href))};
+let pin = '';
+let pickerName = '';
+let cpStudent = null;
+let cpStage = 'current';
+let cpPin = '';
+let cpVals = { current: '', new: '', confirm: '' };
+let unsubWaiting = null;
+let selectedClassFilter = 'Semua';
+let searchQuery = ''; // Menyimpan state kata kunci pencarian
 
-/* ==================== AUDIO ==================== */
-let notifAudioCtx=null;
-function warmUpAudio(){if(!notifAudioCtx){try{notifAudioCtx=new(window.AudioContext||window.webkitAudioContext)()}catch(e){notifAudioCtx=null}}}
-function playTone(ctx,freq,startTime,duration){const osc=ctx.createOscillator(),gain=ctx.createGain();osc.type='sine';osc.frequency.value=freq;gain.gain.setValueAtTime(.0001,startTime);gain.gain.exponentialRampToValueAtTime(.35,startTime+.02);gain.gain.exponentialRampToValueAtTime(.0001,startTime+duration);osc.connect(gain).connect(ctx.destination);osc.start(startTime);osc.stop(startTime+duration+.05)}
-function playCallNotifSound(){if(!notifAudioCtx)return;if(notifAudioCtx.state==='suspended')notifAudioCtx.resume();const now=notifAudioCtx.currentTime;playTone(notifAudioCtx,1046.5,now,.15);playTone(notifAudioCtx,1318.51,now+.18,.15);playTone(notifAudioCtx,1567.98,now+.36,.25)}
+/* PALET WARNA RANDOM UNTUK AVATAR INISIAL */
+const AVATAR_COLORS = [
+  '#4F46E5', '#7C3AED', '#EC4899', '#F59E0B', '#10B981', 
+  '#3B82F6', '#06B6D4', '#8B5CF6', '#D97706', '#059669',
+  '#E11D48', '#0284C7', '#7E22CE', '#B45309', '#0D9488'
+];
 
-/* ==================== GEOLOCATION ==================== */
-window.checkLocation=function(){const dot=document.getElementById('geo-dot'),label=document.getElementById('geo-label'),sub=document.getElementById('geo-sub'),retry=document.getElementById('geo-retry');retry.style.display='none';label.textContent='Mengecek lokasi…';sub.textContent='Mohon tunggu sebentar (menyempurnakan akurasi GPS)';dot.className='geo-dot';if(!navigator.geolocation){dot.className='geo-dot bad';label.textContent='Perangkat tidak mendukung lokasi';sub.textContent='Gunakan browser lain atau hubungi guru piket';return}let best=null,watchId=null,finished=false;function finish(){if(finished)return;finished=true;if(watchId!==null)navigator.geolocation.clearWatch(watchId);if(best){coords=best;dot.className='geo-dot ok';label.textContent='Lokasi terdeteksi';sub.textContent=`Akurasi ±${Math.round(best.accuracy)}m — jarak diverifikasi saat penjemputan`}else{dot.className='geo-dot bad';label.textContent='Lokasi belum ditemukan';sub.textContent='Aktifkan izin lokasi lalu coba lagi';retry.style.display='inline-block'}renderBody()}watchId=navigator.geolocation.watchPosition(pos=>{if(!best||pos.coords.accuracy<best.accuracy)best=pos.coords;if(pos.coords.accuracy<=30)finish()},()=>{if(!best)finish()},{enableHighAccuracy:true,timeout:10000,maximumAge:0});setTimeout(finish,6000)};
+function getAvatarBg(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
+}
 
-/* ==================== LOAD ROSTER SEKALI / CACHE ==================== */
-async function loadRoster(){
-  try{
-    ROSTER=await getRosterOnce();
-    rosterLoaded=true;
-    renderBody();
-  }catch(e){
-    console.error('Gagal memuat roster:',e);
-    document.getElementById('body-content').innerHTML='<div class="empty-state">Gagal memuat daftar siswa. Periksa koneksi internet lalu muat ulang halaman.</div>';
+/* ---------------- NAVIGASI TOMBOL BACK HP / BROWSER ---------------- */
+function openSheetModal() {
+  const overlay = document.getElementById('sheet-overlay');
+  if (!overlay.classList.contains('open')) {
+    overlay.classList.add('open');
+    history.pushState({ sheetOpen: true }, '');
   }
 }
 
-/* Tidak ada listenQueue() global di halaman orang tua.
- * Ini adalah perubahan utama penghematan reads.
- */
-loadRoster();
+window.closeSheet = function closeSheet() {
+  const overlay = document.getElementById('sheet-overlay');
+  if (overlay.classList.contains('open')) {
+    overlay.classList.remove('open');
+    if (unsubWaiting) { unsubWaiting(); unsubWaiting = null; }
+    
+    if (history.state && history.state.sheetOpen) {
+      history.back();
+    }
+  }
+}
+
+window.addEventListener('popstate', function (event) {
+  const overlay = document.getElementById('sheet-overlay');
+  if (overlay && overlay.classList.contains('open')) {
+    overlay.classList.remove('open');
+    if (unsubWaiting) { unsubWaiting(); unsubWaiting = null; }
+  }
+});
+
+/* ---------------- FUNGSI BAGIKAN LINK ---------------- */
+window.shareLink = function shareLink() {
+  const shareData = {
+    title: 'Jemput — An Nashir Islamic School',
+    text: 'Akses link penjemputan siswa An Nashir Islamic School:',
+    url: window.location.href
+  };
+
+  if (navigator.share) {
+    navigator.share(shareData).catch(() => {});
+  } else {
+    navigator.clipboard.writeText(window.location.href);
+    alert('Link penjemputan berhasil disalin!');
+  }
+};
+
+/* ---------------- SUARA NOTIFIKASI & GETAR (DIOPTIMALKAN UNTUK OUTDOOR) ---------------- */
+let notifAudioCtx = null;
+function warmUpAudio(){
+  if(!notifAudioCtx){
+    try{ notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e){ notifAudioCtx = null; }
+  }
+}
+function playTone(ctx, freq, startTime, duration){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.35, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.05);
+}
+function playCallNotifSound(){
+  if(!notifAudioCtx) return;
+  if(notifAudioCtx.state === 'suspended') notifAudioCtx.resume();
+  const now = notifAudioCtx.currentTime;
+  
+  // Kompleksitas nada ditingkatkan menjadi 3 tahap beruntun dengan frekuensi lebih tinggi (lebih nyaring di luar ruangan)
+  playTone(notifAudioCtx, 1046.50, now, 0.15);       // Nada C6
+  playTone(notifAudioCtx, 1318.51, now + 0.18, 0.15); // Nada E6
+  playTone(notifAudioCtx, 1567.98, now + 0.36, 0.25); // Nada G6
+}
+
+/* ---------------- GEOLOCATION ---------------- */
+window.checkLocation = function checkLocation(){
+  const dot = document.getElementById('geo-dot');
+  const label = document.getElementById('geo-label');
+  const sub = document.getElementById('geo-sub');
+  const retry = document.getElementById('geo-retry');
+  retry.style.display='none';
+  label.textContent = 'Mengecek lokasi…';
+  sub.textContent = 'Mohon tunggu sebentar (menyempurnakan akurasi GPS)';
+  dot.className='geo-dot';
+
+  if(!navigator.geolocation){
+    dot.className='geo-dot bad';
+    label.textContent='Perangkat tidak mendukung lokasi';
+    sub.textContent='Gunakan browser lain atau hubungi guru piket';
+    return;
+  }
+
+  let best = null;
+  let watchId = null;
+  let finished = false;
+
+  function finish(){
+    if(finished) return;
+    finished = true;
+    if(watchId !== null) navigator.geolocation.clearWatch(watchId);
+    if(best){
+      coords = best;
+      dot.className='geo-dot ok';
+      label.textContent='Lokasi terdeteksi';
+      sub.textContent = `Akurasi ±${Math.round(best.accuracy)}m — jarak diverifikasi saat penjemputan`;
+    } else {
+      dot.className='geo-dot bad';
+      label.textContent='Lokasi belum ditemukan';
+      sub.textContent='Aktifkan izin lokasi lalu coba lagi';
+      retry.style.display='inline-block';
+    }
+    renderBody();
+  }
+
+  watchId = navigator.geolocation.watchPosition(
+    (pos)=>{
+      if(!best || pos.coords.accuracy < best.accuracy){
+        best = pos.coords;
+      }
+      if(pos.coords.accuracy <= 30){
+        finish();
+      }
+    },
+    (err)=>{
+      if(!best) finish();
+    },
+    { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
+  );
+
+  setTimeout(finish, 6000);
+}
 checkLocation();
 
-/* ==================== RENDER UTAMA ==================== */
+/* ---------------- ROSTER + QUEUE (real-time) ---------------- */
+listenRoster((list)=>{ ROSTER = list; renderBody(); });
+listenQueue((list)=>{ QUEUE = list; renderBody(); });
+
 function renderBody(){
-  const el=document.getElementById('body-content');
-  if(!rosterLoaded){el.innerHTML='<div class="empty-state">Memuat daftar siswa…</div>';return}
-  const classes=['Semua','P1','P2','P3','P4','P5','P6'];
-  el.innerHTML=`
+  const el = document.getElementById('body-content');
+  const classes = ['Semua', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
+
+  el.innerHTML = `
+    <!-- TOMBOL PILIH MODE PENJEMPUTAN -->
     <div class="mode-selection-bar">
-      ${mode==='single'?`<button class="multi-toggle-btn" onclick="switchMode('multi')">➕ Jemput &gt;1 Anak Sekaligus</button>`:mode==='multi'?`<div class="multi-active-banner"><span>☑️ Mode Penjemputan &gt;1 Anak Aktif</span><button class="btn-cancel-mode" onclick="switchMode('single')">Kembali ke 1 Anak</button></div>`:`<div class="multi-active-banner"><span>🔑 Mode Ganti PIN Aktif</span><button class="btn-cancel-mode" onclick="switchMode('single')">Batal</button></div>`}
+      ${mode === 'single' ? `
+        <button class="multi-toggle-btn" onclick="switchMode('multi')">
+          ➕ Jemput >1 Anak Sekaligus
+        </button>
+      ` : mode === 'multi' ? `
+        <div class="multi-active-banner">
+          <span>☑️ Mode Penjemputan >1 Anak Aktif</span>
+          <button class="btn-cancel-mode" onclick="switchMode('single')">Kembali ke 1 Anak</button>
+        </div>
+      ` : `
+        <div class="multi-active-banner">
+          <span>🔑 Mode Ganti PIN Aktif</span>
+          <button class="btn-cancel-mode" onclick="switchMode('single')">Batal</button>
+        </div>
+      `}
     </div>
-    <div class="search-wrap"><span class="search-icon">🔍</span><input class="search-input" id="search-input" value="${searchQuery.replace(/"/g,'&quot;')}" placeholder="Cari nama anak (depan, tengah, belakang)..." oninput="filterList()"></div>
-    <div class="class-filter-wrap">${classes.map(c=>`<button class="class-filter-btn ${selectedClassFilter===c?'active':''}" onclick="selectClassFilter('${c}')">${c}</button>`).join('')}</div>
-    <div class="section-label-row"><div class="section-label">${mode==='multi'?'Centang anak-anak yang akan dijemput:':mode==='gantipin'?'Pilih anak untuk ganti PIN:':'Ketuk nama anak yang akan dijemput:'}</div>${mode==='single'?`<button class="link-btn" onclick="switchMode('gantipin')">🔑 Lupa / Ganti PIN</button>`:''}</div>
-    <div class="student-list" id="student-list"></div>`;
-  filterList();updatePickupBar();
+
+    <div class="search-wrap">
+      <span class="search-icon">🔍</span>
+      <input class="search-input" id="search-input" value="${searchQuery.replace(/"/g, '&quot;')}" placeholder="Cari nama anak (depan, tengah, belakang)..." oninput="filterList()">
+    </div>
+    
+    <!-- FILTER KELAS -->
+    <div class="class-filter-wrap">
+      ${classes.map(c => `
+        <button class="class-filter-btn ${selectedClassFilter === c ? 'active' : ''}" onclick="selectClassFilter('${c}')">
+          ${c}
+        </button>
+      `).join('')}
+    </div>
+
+    <div class="section-label-row">
+      <div class="section-label">
+        ${mode === 'multi' ? 'Centang anak-anak yang akan dijemput:' : mode === 'gantipin' ? 'Pilih anak untuk ganti PIN:' : 'Ketuk nama anak yang akan dijemput:'}
+      </div>
+      ${mode === 'single' ? `<button class="link-btn" onclick="switchMode('gantipin')">🔑 Lupa / Ganti PIN</button>` : ''}
+    </div>
+    
+    <div class="student-list" id="student-list"></div>
+  `;
+  filterList();
+  updatePickupBar();
 }
 
-window.switchMode=function(newMode){stopAllWaitingListeners();mode=newMode;selectedStudentIds=[];renderBody()};
-window.selectClassFilter=function(c){selectedClassFilter=c;renderBody()};
-
-/* ==================== FILTER ==================== */
-window.filterList=function(){const input=document.getElementById('search-input');searchQuery=input?input.value:'';const terms=searchQuery.toLowerCase().trim().split(/\s+/).filter(t=>t.length>0);const filtered=ROSTER.filter(s=>{const name=String(s.name||'').toLowerCase();const matchName=terms.every(t=>name.includes(t));const matchClass=selectedClassFilter==='Semua'||String(s.class||'').trim().toUpperCase()===selectedClassFilter.toUpperCase();return matchName&&matchClass}).sort((a,b)=>String(a.name||'').localeCompare(String(b.name||''),'id',{sensitivity:'base'}));renderStudentList(filtered)};
-
-function renderStudentList(list){const el=document.getElementById('student-list');if(!el)return;if(!list.length){el.innerHTML=`<div class="empty-state">${ROSTER.length===0?'Daftar siswa kosong.':'Tidak ada nama siswa yang cocok.'}</div>`;return}el.innerHTML=list.map(s=>{const isSelected=selectedStudentIds.includes(s.id);const initials=String(s.name||'').split(' ').slice(0,2).map(w=>w[0]).join('');let onClick='';if(mode==='single')onClick=`onclick="startSinglePickup('${s.id}')"`;else if(mode==='multi')onClick=`onclick="toggleSelectStudent('${s.id}')"`;else if(mode==='gantipin')onClick=`onclick="openChangePin('${s.id}')"`;const avatarStyle=`style="background-color:${getAvatarBg(s.name||'')};color:#ffffff;"`;return `<div class="student-row ${isSelected?'selected':''}" ${onClick}><div class="student-left">${mode==='multi'?`<div class="checkbox ${isSelected?'checked':''}">${isSelected?'✓':''}</div>`:`<div class="avatar" ${avatarStyle}>${initials}</div>`}<div><div class="student-name">${s.name}</div><div class="student-class">Kelas ${s.class}</div></div></div><span class="chevron">${mode==='gantipin'?'🔑':'›'}</span></div>`}).join('')}
-
-/* ==================== SINGLE / MULTI PICKUP ==================== */
-window.startSinglePickup=function(studentId){selectedStudentIds=[studentId];currentMultiIndex=0;verifiedPickups=[];pin='';pickerName='';renderPinSheet();openSheetModal();setTimeout(()=>document.getElementById('picker-name')?.focus(),50)};
-window.toggleSelectStudent=function(id){const i=selectedStudentIds.indexOf(id);if(i>-1)selectedStudentIds.splice(i,1);else selectedStudentIds.push(id);filterList();updatePickupBar()};
-function updatePickupBar(){const bar=document.getElementById('pickup-bar'),count=document.getElementById('pickup-bar-count');if(!bar)return;if(mode==='multi'&&selectedStudentIds.length){bar.style.display='flex';count.textContent=`${selectedStudentIds.length} Anak Terpilih`}else bar.style.display='none'}
-window.startMultiPickupProcess=function(){if(!selectedStudentIds.length)return;stopAllWaitingListeners();currentMultiIndex=0;verifiedPickups=[];pin='';pickerName='';renderPinSheet();openSheetModal();setTimeout(()=>document.getElementById('picker-name')?.focus(),50)};
-window.updatePickerName=function(v){pickerName=v};
-
-function renderPinSheet(pinErr,nameErr){const c=document.getElementById('sheet-content'),safeName=pickerName.replace(/"/g,'&quot;'),id=selectedStudentIds[currentMultiIndex],student=ROSTER.find(s=>s.id===id),total=selectedStudentIds.length;if(!student){closeSheet();return}c.innerHTML=`<div class="sheet-title">Verifikasi PIN Penjemputan</div>${total>1?`<div class="multi-step-badge">Anak ke-${currentMultiIndex+1} dari ${total}</div>`:''}<div class="sheet-sub">Menjemput: <b>${student.name}</b> (Kelas ${student.class})</div>${currentMultiIndex===0?`<div class="field-label" style="margin-top:8px;">Nama Penjemput <span style="color:var(--coral);">*wajib diisi</span></div><input class="text-input" id="picker-name" value="${safeName}" oninput="updatePickerName(this.value)" placeholder="cth: Ayah / Ibu / Pak Budi (Ojek)"><div class="pin-error">${nameErr||''}</div>`:`<div class="picker-info-box">Penjemput: <b>${pickerName}</b></div>`}<div class="field-label" style="margin-top:12px;text-align:center;">Masukkan PIN milik <b>${student.name}</b></div><div class="pin-dots" id="pin-dots">${[0,1,2,3].map(i=>`<div class="pin-dot ${i<pin.length?'filled':''}"></div>`).join('')}</div><div class="pin-error">${pinErr||''}</div><div class="keypad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="key" onclick="pressKey('${n}')">${n}</button>`).join('')}<button class="key func" onclick="closeSheet()">Batal</button><button class="key" onclick="pressKey('0')">0</button><button class="key func" onclick="backspace()">⌫</button></div>`}
-window.pressKey=function(n){warmUpAudio();if(!pickerName.trim()){renderPinSheet('','Isi nama penjemput terlebih dahulu.');document.getElementById('picker-name')?.focus();return}if(pin.length>=4)return;pin+=n;renderPinSheet();if(pin.length===4)checkAndAdvanceMultiPickup()};
-window.backspace=function(){pin=pin.slice(0,-1);renderPinSheet()};
-
-async function checkAndAdvanceMultiPickup(){const id=selectedStudentIds[currentMultiIndex],c=document.getElementById('sheet-content');c.style.opacity='.5';c.style.pointerEvents='none';let result;try{result=await submitPickup(id,pin,pickerName.trim(),coords)}catch(e){c.style.opacity='1';c.style.pointerEvents='auto';pin='';renderPinSheet('Gagal menghubungi server. Periksa koneksi internet Anda.');return}c.style.opacity='1';c.style.pointerEvents='auto';if(result.ok){verifiedPickups.push({queueId:result.queueId,studentId:id});currentMultiIndex++;pin='';if(currentMultiIndex<selectedStudentIds.length)renderPinSheet();else{selectedStudentIds=[];updatePickupBar();showWaitingScreen()}return}pin='';const messages={wrong_pin:`PIN salah. ${result.attemptsLeft!=null?`Sisa percobaan: ${result.attemptsLeft}.`:''}`,already_queued:'Siswa ini sudah masuk dalam antrean.'};const student=ROSTER.find(s=>s.id===id);if(result.reason==='locked')c.innerHTML=`<div class="sheet-title">Verifikasi terkunci</div><div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${student.name}.</div><div class="lockout-box">🔒 Akses terkunci sementara. Silakan hubungi <b>guru piket</b> untuk verifikasi.</div><button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>`;else if(result.reason==='out_of_range')c.innerHTML=`<div class="sheet-title">Di luar radius sekolah</div><div class="sheet-sub">Lokasi Anda saat ini terlalu jauh dari sekolah.</div><div class="warn-box">📍 Mendekatlah ke lokasi sekolah lalu coba kembali.</div><button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>`;else renderPinSheet(messages[result.reason]||'Terjadi kesalahan, coba lagi.')}
-
-/* ==================== WAITING: PANTAU HANYA queueId MILIK USER ==================== */
-let previousStudentStatuses={};
-function stopAllWaitingListeners(){if(Array.isArray(unsubWaiting))unsubWaiting.forEach(unsub=>{try{unsub()}catch(e){}});unsubWaiting=[];previousStudentStatuses={}}
-
-function showWaitingScreen(){const c=document.getElementById('sheet-content');if(!c)return;stopAllWaitingListeners();previousStudentStatuses={};const studentIds=verifiedPickups.map(p=>p.studentId);const queueByStudent=new Map(verifiedPickups.map(p=>[p.studentId,p.queueId]));const currentStudentsData={};studentIds.forEach(id=>{const r=ROSTER.find(x=>x.id===id)||{name:'Siswa',class:'-'};currentStudentsData[id]={id,name:r.name,class:r.class,status:'waiting'}});
-  function renderWaiting(){const arr=studentIds.map(id=>currentStudentsData[id]);const anyCalled=arr.some(x=>x.status==='called');const allDone=arr.every(x=>x.status==='called'||x.status==='completed');c.innerHTML=`<div class="success-wrap"><div class="success-icon ${anyCalled?'called-icon':'waiting-icon'}">${allDone?'🎉':anyCalled?'🔔':'⏳'}</div><div class="success-title">${allDone?'Semua Anak Sudah Dipanggil!':anyCalled?'Anak Dipanggil!':'Dalam Antrean'}</div><div class="success-sub">${allDone?'Silakan sambut anak-anak Anda di pintu gerbang.':'Perhatikan daftar di bawah ini:'}</div><div class="queue-child-list">${arr.map(child=>`<div class="queue-child-card ${child.status==='called'?'called':child.status==='completed'?'completed':''}"><div class="queue-child-info"><div class="queue-child-name">${child.name}</div><div class="queue-child-class">Kelas ${child.class}</div></div><div class="queue-child-badge">${child.status==='called'?'✅ Selesai / Dipanggil':child.status==='completed'?'✔️ Diserahkan':'⏳ Menunggu'}</div></div>`).join('')}</div>${allDone?`<button class="sheet-btn" onclick="closeSheet();switchMode('single');">Selesai</button>`:''}</div>`}
-  renderWaiting();
-  verifiedPickups.forEach(p=>{const unsub=listenQueueEntry(p.queueId,entry=>{const previous=currentStudentsData[p.studentId]?.status;let nextStatus;if(!entry)nextStatus='completed';else nextStatus=entry.status||'waiting';currentStudentsData[p.studentId].status=nextStatus;if(nextStatus==='called'&&previous!=='called'){if(navigator.vibrate)navigator.vibrate([400,100,400,150,400]);playCallNotifSound()}renderWaiting();if(nextStatus==='completed'){/* Listener tetap aktif sampai semua selesai agar perubahan deletion tidak terlewat; unsubscribe dilakukan setelah render. */}});unsubWaiting.push(unsub)})
+window.switchMode = function switchMode(newMode){
+  mode = newMode;
+  selectedStudentIds = [];
+  renderBody();
 }
 
-/* ==================== GANTI PIN ==================== */
-window.openChangePin=function(id){cpStudent=ROSTER.find(s=>s.id===id);if(!cpStudent)return;cpStage='current';cpPin='';cpVals={current:'',new:'',confirm:''};renderChangePinSheet();openSheetModal()};
-const CP_LABELS={current:{title:'Verifikasi PIN Lama',sub:n=>`Masukkan PIN lama untuk ${n}`},new:{title:'Buat PIN Baru',sub:()=>`Masukkan 4 digit PIN baru`},confirm:{title:'Konfirmasi PIN Baru',sub:()=>`Ketik ulang PIN baru untuk konfirmasi`}};
-function renderChangePinSheet(err){const c=document.getElementById('sheet-content'),{title,sub}=CP_LABELS[cpStage];c.innerHTML=`<div class="sheet-title">${title}</div><div class="sheet-sub">${sub(cpStudent.name)} (Kelas ${cpStudent.class})</div><div class="pin-dots" id="pin-dots">${[0,1,2,3].map(i=>`<div class="pin-dot ${i<cpPin.length?'filled':''}"></div>`).join('')}</div><div class="pin-error">${err||''}</div><div class="keypad">${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="key" onclick="cpPressKey('${n}')">${n}</button>`).join('')}<button class="key func" onclick="closeSheet()">Batal</button><button class="key" onclick="cpPressKey('0')">0</button><button class="key func" onclick="cpBackspace()">⌫</button></div>`}
-window.cpPressKey=function(n){warmUpAudio();if(cpPin.length>=4)return;cpPin+=n;renderChangePinSheet();if(cpPin.length===4)cpAdvance()};
-window.cpBackspace=function(){cpPin=cpPin.slice(0,-1);renderChangePinSheet()};
-async function cpAdvance(){if(cpStage==='current'){cpVals.current=cpPin;cpPin='';cpStage='new';renderChangePinSheet();return}if(cpStage==='new'){cpVals.new=cpPin;cpPin='';cpStage='confirm';renderChangePinSheet();return}cpVals.confirm=cpPin;if(cpVals.new!==cpVals.confirm){cpPin='';cpStage='new';renderChangePinSheet('PIN baru tidak cocok. Silakan ulangi pembuatannya.');return}const c=document.getElementById('sheet-content');c.style.opacity='.5';c.style.pointerEvents='none';let result;try{result=await changeFamilyPin(cpStudent.id,cpVals.current,cpVals.new,coords)}catch(e){c.style.opacity='1';c.style.pointerEvents='auto';cpPin='';cpStage='current';cpVals={current:'',new:'',confirm:''};renderChangePinSheet('Gagal menghubungi server. Periksa koneksi internet Anda.');return}c.style.opacity='1';c.style.pointerEvents='auto';if(result.ok){c.innerHTML=`<div class="success-wrap"><div class="success-icon">✓</div><div class="success-title">PIN Berhasil Diganti</div><div class="success-sub">PIN untuk ${cpStudent.name} telah berhasil diperbarui.</div><button class="sheet-btn" onclick="closeSheet();switchMode('single');">Selesai</button></div>`;return}cpPin='';cpVals={current:'',new:'',confirm:''};if(result.reason==='locked')c.innerHTML=`<div class="sheet-title">Verifikasi terkunci</div><div class="sheet-sub">Terlalu banyak percobaan PIN salah.</div><div class="lockout-box">🔒 Terkunci sementara. Silakan hubungi <b>guru piket</b>.</div><button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>`;else if(result.reason==='out_of_range')c.innerHTML=`<div class="sheet-title">Di luar radius sekolah</div><div class="sheet-sub">Anda harus berada di sekitar sekolah untuk mengganti PIN.</div><div class="warn-box">📍 Mendekatlah ke lokasi sekolah lalu coba lagi.</div><button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>`;else{cpStage='current';renderChangePinSheet(`PIN lama salah. ${result.attemptsLeft!=null?`Sisa percobaan: ${result.attemptsLeft}.`:''}`)}}
+window.selectClassFilter = function selectClassFilter(c){
+  selectedClassFilter = c;
+  renderBody();
+}
+
+/* ---------------- LOGIKA PENCARIAN FLEKSIBEL & URUT ABJAD ---------------- */
+window.filterList = function filterList(){
+  const searchInput = document.getElementById('search-input');
+  searchQuery = searchInput ? searchInput.value : '';
+  
+  const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/).filter(t => t.length > 0);
+  
+  const filtered = ROSTER.filter(s => {
+    const studentName = s.name.toLowerCase();
+    const matchName = searchTerms.every(term => studentName.includes(term));
+    const matchClass = selectedClassFilter === 'Semua' || String(s.class).trim().toUpperCase() === selectedClassFilter.toUpperCase();
+    
+    return matchName && matchClass;
+  });
+
+  // Urutkan daftar siswa secara rapi sesuai abjad (A - Z)
+  filtered.sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
+
+  renderStudentList(filtered);
+}
+
+function renderStudentList(list){
+  const el = document.getElementById('student-list');
+  if(!el) return;
+  if(list.length===0){
+    el.innerHTML = `<div class="empty-state">${ROSTER.length===0 ? 'Memuat daftar siswa…' : 'Tidak ada nama siswa yang cocok.'}</div>`;
+    return;
+  }
+  el.innerHTML = list.map(s=>{
+    const called = QUEUE.find(q=>q.studentId===s.id);
+    const isSelected = selectedStudentIds.includes(s.id);
+    const initials = s.name.split(' ').slice(0,2).map(w=>w[0]).join('');
+    
+    let onClickHandler = '';
+    if(!called){
+      if(mode === 'single'){
+        onClickHandler = `onclick="startSinglePickup('${s.id}')"`;
+      } else if(mode === 'multi'){
+        onClickHandler = `onclick="toggleSelectStudent('${s.id}')"`;
+      } else if(mode === 'gantipin'){
+        onClickHandler = `onclick="openChangePin('${s.id}')"`;
+      }
+    }
+
+    const avatarStyle = called ? '' : `style="background-color: ${getAvatarBg(s.name)}; color: #ffffff;"`;
+
+    return `
+    <div class="student-row ${called ? 'disabled' : ''} ${isSelected ? 'selected' : ''}" ${onClickHandler}>
+      <div class="student-left">
+        ${mode === 'multi' && !called ? `
+          <div class="checkbox ${isSelected ? 'checked' : ''}">
+            ${isSelected ? '✓' : ''}
+          </div>
+        ` : `<div class="avatar" ${avatarStyle}>${initials}</div>`}
+        <div>
+          <div class="student-name">${s.name}</div>
+          <div class="student-class">Kelas ${s.class}</div>
+        </div>
+      </div>
+      ${called ? `<span class="status-tag">Sudah dipanggil</span>` : `<span class="chevron">${mode==='gantipin' ? '🔑' : '›'}</span>`}
+    </div>`;
+  }).join('');
+}
+
+/* ---------------- ALUR PENJEMPUTAN 1 ANAK (SINGLE) ---------------- */
+window.startSinglePickup = function startSinglePickup(studentId){
+  selectedStudentIds = [studentId];
+  currentMultiIndex = 0;
+  verifiedPickups = [];
+  pin = '';
+  pickerName = '';
+
+  renderPinSheet();
+  openSheetModal();
+  setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
+}
+
+/* ---------------- ALUR PENJEMPUTAN >1 ANAK (MULTI) ---------------- */
+window.toggleSelectStudent = function toggleSelectStudent(id){
+  const idx = selectedStudentIds.indexOf(id);
+  if(idx > -1){
+    selectedStudentIds.splice(idx, 1);
+  } else {
+    selectedStudentIds.push(id);
+  }
+  filterList();
+  updatePickupBar();
+}
+
+function updatePickupBar(){
+  const bar = document.getElementById('pickup-bar');
+  const countEl = document.getElementById('pickup-bar-count');
+  if(!bar) return;
+
+  if(mode === 'multi' && selectedStudentIds.length > 0){
+    bar.style.display = 'flex';
+    countEl.textContent = `${selectedStudentIds.length} Anak Terpilih`;
+  } else {
+    bar.style.display = 'none';
+  }
+}
+
+window.startMultiPickupProcess = function startMultiPickupProcess(){
+  if(selectedStudentIds.length === 0) return;
+  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
+
+  currentMultiIndex = 0;
+  verifiedPickups = [];
+  pin = '';
+  pickerName = '';
+  
+  renderPinSheet();
+  openSheetModal();
+  setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
+}
+
+window.updatePickerName = function updatePickerName(v){
+  pickerName = v;
+}
+
+function renderPinSheet(pinErr, nameErr){
+  const c = document.getElementById('sheet-content');
+  const safeName = pickerName.replace(/"/g,'&quot;');
+  const currentStudentId = selectedStudentIds[currentMultiIndex];
+  const student = ROSTER.find(s => s.id === currentStudentId);
+  const totalStudents = selectedStudentIds.length;
+
+  c.innerHTML = `
+    <div class="sheet-title">Verifikasi PIN Penjemputan</div>
+    ${totalStudents > 1 ? `<div class="multi-step-badge">Anak ke-${currentMultiIndex + 1} dari ${totalStudents}</div>` : ''}
+    <div class="sheet-sub">Menjemput: <b>${student.name}</b> (Kelas ${student.class})</div>
+
+    ${currentMultiIndex === 0 ? `
+      <div class="field-label" style="margin-top:8px;">Nama Penjemput <span style="color:var(--coral);">*wajib diisi</span></div>
+      <input class="text-input" id="picker-name" value="${safeName}" oninput="updatePickerName(this.value)" placeholder="cth: Ayah / Ibu / Pak Budi (Ojek)">
+      <div class="pin-error">${nameErr||''}</div>
+    ` : `
+      <div class="picker-info-box">
+        Penjemput: <b>${pickerName}</b>
+      </div>
+    `}
+
+    <div class="field-label" style="margin-top:12px; text-align:center;">
+      Masukkan PIN milik <b>${student.name}</b>
+    </div>
+    <div class="pin-dots" id="pin-dots">
+      ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<pin.length?'filled':''}"></div>`).join('')}
+    </div>
+    <div class="pin-error">${pinErr||''}</div>
+
+    <div class="keypad">
+      ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="key" onclick="pressKey('${n}')">${n}</button>`).join('')}
+      <button class="key func" onclick="closeSheet()">Batal</button>
+      <button class="key" onclick="pressKey('0')">0</button>
+      <button class="key func" onclick="backspace()">⌫</button>
+    </div>
+  `;
+}
+
+window.pressKey = function pressKey(n){
+  warmUpAudio();
+  if(!pickerName.trim()){
+    renderPinSheet('', 'Isi nama penjemput terlebih dahulu.');
+    document.getElementById('picker-name')?.focus();
+    return;
+  }
+  if(pin.length>=4) return;
+  pin += n;
+  renderPinSheet();
+  if(pin.length===4) checkAndAdvanceMultiPickup();
+}
+
+window.backspace = function backspace(){
+  pin = pin.slice(0,-1);
+  renderPinSheet();
+}
+
+async function checkAndAdvanceMultiPickup(){
+  const currentStudentId = selectedStudentIds[currentMultiIndex];
+  const dotsEl = document.getElementById('pin-dots');
+  const c = document.getElementById('sheet-content');
+  
+  c.style.opacity='.5'; c.style.pointerEvents='none';
+
+  let result;
+  try {
+    result = await submitPickup(currentStudentId, pin, pickerName.trim(), coords);
+  } catch(e) {
+    c.style.opacity='1'; c.style.pointerEvents='auto';
+    pin='';
+    renderPinSheet('Gagal menghubungi server. Periksa koneksi internet Anda.');
+    return;
+  }
+
+  c.style.opacity='1'; c.style.pointerEvents='auto';
+
+  if(result.ok){
+    verifiedPickups.push({
+      queueId: result.queueId,
+      studentId: currentStudentId
+    });
+
+    currentMultiIndex++;
+    pin = '';
+
+    if(currentMultiIndex < selectedStudentIds.length){
+      renderPinSheet();
+    } else {
+      selectedStudentIds = [];
+      updatePickupBar();
+      showWaitingScreen();
+    }
+    return;
+  }
+
+  pin='';
+  if(dotsEl) dotsEl.classList.add('shake');
+
+  const messages = {
+    wrong_pin: `PIN salah. ${result.attemptsLeft!=null ? `Sisa percobaan: ${result.attemptsLeft}.` : ''}`,
+    locked: null,
+    out_of_range: null,
+    already_queued: 'Siswa ini sudah masuk dalam antrean.',
+  };
+
+  const student = ROSTER.find(s=>s.id===currentStudentId);
+
+  if(result.reason==='locked'){
+    c.innerHTML = `
+      <div class="sheet-title">Verifikasi terkunci</div>
+      <div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${student.name}.</div>
+      <div class="lockout-box">🔒 Akses terkunci sementara. Silakan hubungi <b>guru piket</b> untuk verifikasi.</div>
+      <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
+    `;
+  } else if(result.reason==='out_of_range'){
+    c.innerHTML = `
+      <div class="sheet-title">Di luar radius sekolah</div>
+      <div class="sheet-sub">Lokasi Anda saat ini terlalu jauh dari sekolah.</div>
+      <div class="warn-box">📍 Mendekatlah ke lokasi sekolah lalu coba kembali.</div>
+      <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
+    `;
+  } else {
+    renderPinSheet(messages[result.reason] || 'Terjadi kesalahan, coba lagi.');
+  }
+}
+
+/* ---------------- TAMPILAN ANTREAN REAL-TIME DENGAN STATUS PER ANAK ---------------- */
+let previousStudentStatuses = {};
+
+function showWaitingScreen() {
+  const c = document.getElementById('sheet-content');
+  if (!c) return;
+
+  if (unsubWaiting) { unsubWaiting(); unsubWaiting = null; }
+  previousStudentStatuses = {};
+
+  const studentIds = verifiedPickups.map(p => p.studentId);
+
+  unsubWaiting = listenQueue((queueList) => {
+    const currentStudentsData = studentIds.map(id => {
+      const rosterData = ROSTER.find(r => r.id === id) || { name: 'Siswa', class: '-' };
+      const queueData = queueList.find(q => q.studentId === id);
+      return {
+        id: id,
+        name: rosterData.name,
+        class: rosterData.class,
+        status: queueData ? queueData.status : 'completed'
+      };
+    });
+
+    let hasNewCall = false;
+    currentStudentsData.forEach(child => {
+      const prevStatus = previousStudentStatuses[child.id];
+      if (child.status === 'called' && prevStatus !== 'called') {
+        hasNewCall = true;
+      }
+      previousStudentStatuses[child.id] = child.status;
+    });
+
+    if (hasNewCall) {
+      // Pola getar ditingkatkan intensitasnya agar terasa di luar ruangan
+      if (navigator.vibrate) navigator.vibrate([400, 100, 400, 150, 400]);
+      playCallNotifSound();
+    }
+
+    const allCalledOrDone = currentStudentsData.every(c => c.status === 'called' || c.status === 'completed');
+    const anyCalled = currentStudentsData.some(c => c.status === 'called');
+
+    c.innerHTML = `
+      <div class="success-wrap">
+        <div class="success-icon ${anyCalled ? 'called-icon' : 'waiting-icon'}">
+          ${allCalledOrDone ? '🎉' : anyCalled ? '🔔' : '⏳'}
+        </div>
+        
+        <div class="success-title">
+          ${allCalledOrDone ? 'Semua Anak Sudah Dipanggil!' : anyCalled ? 'Anak Dipanggil!' : 'Dalam Antrean'}
+        </div>
+        
+        <div class="success-sub">
+          ${allCalledOrDone ? 'Silakan sambut anak-anak Anda di pintu gerbang.' : 'Perhatikan daftar di bawah ini:'}
+        </div>
+
+        <div class="queue-child-list">
+          ${currentStudentsData.map(child => `
+            <div class="queue-child-card ${child.status === 'called' ? 'called' : child.status === 'completed' ? 'completed' : ''}">
+              <div class="queue-child-info">
+                <div class="queue-child-name">${child.name}</div>
+                <div class="queue-child-class">Kelas ${child.class}</div>
+              </div>
+              <div class="queue-child-badge">
+                ${child.status === 'called' ? '✅ Selesai / Dipanggil' : child.status === 'completed' ? '✔️ Diserahkan' : '⏳ Menunggu'}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        ${allCalledOrDone ? `
+          <button class="sheet-btn" onclick="closeSheet(); switchMode('single');">
+            Selesai
+          </button>
+        ` : ''}
+      </div>
+    `;
+  });
+}
+
+/* ---------------- GANTI PIN ---------------- */
+window.openChangePin = function openChangePin(id){
+  cpStudent = ROSTER.find(s=>s.id===id);
+  cpStage = 'current'; cpPin = ''; cpVals = { current:'', new:'', confirm:'' };
+  renderChangePinSheet();
+  openSheetModal();
+}
+
+const CP_LABELS = {
+  current: { title: 'Verifikasi PIN Lama', sub: (n)=>`Masukkan PIN lama untuk ${n}` },
+  new:     { title: 'Buat PIN Baru',        sub: ()=>'Masukkan 4 digit PIN baru' },
+  confirm: { title: 'Konfirmasi PIN Baru', sub: ()=>'Ketik ulang PIN baru untuk konfirmasi' },
+};
+
+function renderChangePinSheet(err){
+  const c = document.getElementById('sheet-content');
+  const { title, sub } = CP_LABELS[cpStage];
+  c.innerHTML = `
+    <div class="sheet-title">${title}</div>
+    <div class="sheet-sub">${sub(cpStudent.name)} (Kelas ${cpStudent.class})</div>
+    <div class="pin-dots" id="pin-dots">
+      ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<cpPin.length?'filled':''}"></div>`).join('')}
+    </div>
+    <div class="pin-error">${err||''}</div>
+    <div class="keypad">
+      ${[1,2,3,4,5,6,7,8,9].map(n=>`<button class="key" onclick="cpPressKey('${n}')">${n}</button>`).join('')}
+      <button class="key func" onclick="closeSheet()">Batal</button>
+      <button class="key" onclick="cpPressKey('0')">0</button>
+      <button class="key func" onclick="cpBackspace()">⌫</button>
+    </div>
+  `;
+}
+
+window.cpPressKey = function cpPressKey(n){
+  warmUpAudio();
+  if(cpPin.length>=4) return;
+  cpPin += n;
+  renderChangePinSheet();
+  if(cpPin.length===4) cpAdvance();
+}
+
+window.cpBackspace = function cpBackspace(){
+  cpPin = cpPin.slice(0,-1);
+  renderChangePinSheet();
+}
+
+async function cpAdvance(){
+  if(cpStage === 'current'){
+    cpVals.current = cpPin; cpPin = ''; cpStage = 'new';
+    renderChangePinSheet();
+    return;
+  }
+  if(cpStage === 'new'){
+    cpVals.new = cpPin; cpPin = ''; cpStage = 'confirm';
+    renderChangePinSheet();
+    return;
+  }
+  cpVals.confirm = cpPin;
+  if(cpVals.new !== cpVals.confirm){
+    cpPin = ''; cpStage = 'new';
+    renderChangePinSheet('PIN baru tidak cocok. Silakan ulangi pembuatannya.');
+    return;
+  }
+
+  const dotsEl = document.getElementById('pin-dots');
+  const c = document.getElementById('sheet-content');
+  c.style.opacity='.5'; c.style.pointerEvents='none';
+  let result;
+  try{
+    result = await changeFamilyPin(cpStudent.id, cpVals.current, cpVals.new, coords);
+  }catch(e){
+    c.style.opacity='1'; c.style.pointerEvents='auto';
+    cpPin=''; cpStage='current'; cpVals={current:'',new:'',confirm:''};
+    renderChangePinSheet('Gagal menghubungi server. Periksa koneksi internet Anda.');
+    return;
+  }
+  c.style.opacity='1'; c.style.pointerEvents='auto';
+
+  if(result.ok){
+    c.innerHTML = `
+      <div class="success-wrap">
+        <div class="success-icon">✓</div>
+        <div class="success-title">PIN Berhasil Diganti</div>
+        <div class="success-sub">PIN untuk ${cpStudent.name} telah berhasil diperbarui.</div>
+        <button class="sheet-btn" onclick="closeSheet(); switchMode('single');">Selesai</button>
+      </div>
+    `;
+    return;
+  }
+
+  cpPin=''; cpVals={current:'',new:'',confirm:''};
+  if(dotsEl) dotsEl.classList.add('shake');
+
+  if(result.reason === 'locked'){
+    c.innerHTML = `
+      <div class="sheet-title">Verifikasi terkunci</div>
+      <div class="sheet-sub">Terlalu banyak percobaan PIN salah.</div>
+      <div class="lockout-box">🔒 Terkunci sementara. Silakan hubungi <b>guru piket</b>.</div>
+      <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
+    `;
+  } else if(result.reason === 'out_of_range'){
+    c.innerHTML = `
+      <div class="sheet-title">Di luar radius sekolah</div>
+      <div class="sheet-sub">Anda harus berada di sekitar sekolah untuk mengganti PIN.</div>
+      <div class="warn-box">📍 Mendekatlah ke lokasi sekolah lalu coba lagi.</div>
+      <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
+    `;
+  } else {
+    cpStage = 'current';
+    renderChangePinSheet(`PIN lama salah. ${result.attemptsLeft!=null ? `Sisa percobaan: ${result.attemptsLeft}.` : ''}`);
+  }
+}
 </script>
 </body>
 </html>
