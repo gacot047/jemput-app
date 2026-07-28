@@ -187,6 +187,14 @@
     color: #a7f3d0;
   }
   .btn-done:hover { background: rgba(16, 185, 129, 0.2); }
+  .done-caption {
+    font-size: 12.5px;
+    color: #6ee7b7;
+    font-weight: 600;
+    text-align: center;
+    padding: 8px 4px;
+    opacity: 0.85;
+  }
 
   .empty-state {
     grid-column: 1 / -1;
@@ -252,7 +260,7 @@
 </div>
 
 <script type="module">
-import { watchAdminSession, adminLogin, listenQueue, markCalled, markPickupDone } from "./firebase-config.js";
+import { watchAdminSession, adminLogin, listenQueue, markCalled } from "./firebase-config.js";
 
 let currentQueue = [];
 let selectedClassFilter = 'ALL';
@@ -339,7 +347,7 @@ function renderQueue() {
         <div class="picker-info">Penjemput: <b>${item.picker || 'Orang Tua'}</b> · ${getTimeAgo(item.time)}</div>
       </div>
       ${called
-        ? `<button class="btn-action btn-done" onclick="doMarkDone('${item.id}')">✓ Selesai — anak sudah diserahkan</button>`
+        ? `<div class="done-caption">✓ Selesai dipanggil — akan tersimpan hingga papan direset tengah malam</div>`
         : `<button class="btn-action btn-call" onclick="doMarkCalled('${item.id}')">📢 Panggil Keluar</button>`}
     </div>
   `;
@@ -349,10 +357,6 @@ function renderQueue() {
 window.doMarkCalled = async function doMarkCalled(id){
   try{ await markCalled(id); }
   catch(e){ alert('Gagal menandai dipanggil, coba lagi.'); }
-}
-window.doMarkDone = async function doMarkDone(id){
-  try{ await markPickupDone(id); }
-  catch(e){ alert('Gagal menandai selesai, coba lagi.'); }
 }
 
 /* ---------------- HELPER WAKTU (Firestore Timestamp) ---------------- */

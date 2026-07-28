@@ -41,6 +41,10 @@ async function checkGeofence(lat, lng, accuracy) {
     throw new HttpsError("invalid-argument", "Lokasi tidak terdeteksi.");
   }
   const dist = distanceMeters(lat, lng, config.schoolLat, config.schoolLng);
+  // GPS di HP tidak pernah 100% presisi — browser melaporkan seberapa besar
+  // kemungkinan melesetnya lewat `accuracy` (dalam meter). Kita tambahkan
+  // itu sebagai toleransi, dibatasi maksimum ACCURACY_CAP supaya tidak bisa
+  // disalahgunakan dengan mengirim accuracy palsu yang sangat besar.
   const ACCURACY_CAP = 150;
   const buffer = Math.min(typeof accuracy === "number" ? accuracy : 0, ACCURACY_CAP);
   const allowedRadius = config.radiusMeters + buffer;
@@ -51,6 +55,9 @@ async function checkGeofence(lat, lng, accuracy) {
  * requestPickup — dipanggil dari Aplikasi Orang Tua.
  * Input:  { studentId, pin, pickerName, lat, lng }
  * Output: { ok: true } atau { ok:false, reason, attemptsLeft? }
+ *
+ * Semua verifikasi (PIN + radius lokasi) terjadi di sini, di server —
+ * bukan di HP orang tua — supaya tidak bisa diakali lewat DevTools browser.
  */
 exports.requestPickup = onCall(async (request) => {
   const { studentId, pin, pickerName, lat, lng, accuracy } = request.data || {};
@@ -121,6 +128,11 @@ exports.requestPickup = onCall(async (request) => {
 
 /**
  * changeFamilyPin — dipanggil dari Aplikasi Orang Tua, TANPA login.
+ * Orang tua membuktikan diri dengan mengetahui PIN LAMA (mirip ganti PIN
+ * ATM). Berguna kalau PIN sempat diketahui pihak lain (misalnya driver
+ * ojek online yang menjemputkan anak sekali waktu).
+ * Input:  { studentId, currentPin, newPin, lat, lng }
+ * Output: { ok: true } atau { ok:false, reason, attemptsLeft? }
  */
 exports.changeFamilyPin = onCall(async (request) => {
   const { studentId, currentPin, newPin, lat, lng, accuracy } = request.data || {};
@@ -143,6 +155,9 @@ exports.changeFamilyPin = onCall(async (request) => {
   }
   const priv = privSnap.data();
 
+  // Memakai penghitung percobaan gagal yang SAMA dengan requestPickup —
+  // supaya orang yang coba menebak-nebak PIN lewat sini pun ikut terkena
+  // kunci otomatis, bukan celah terpisah.
   if (priv.lockUntil && priv.lockUntil.toMillis() > Date.now()) {
     return { ok: false, reason: "locked" };
   }
@@ -173,35 +188,6 @@ exports.changeFamilyPin = onCall(async (request) => {
 
   return { ok: true };
 });
-
-/* ---------- AUTO RESET QUEUE (CRON JOB) ---------- */
-/**
- * autoResetQueue — Berjalan otomatis tiap jam 23:59 WIB.
- * Menghapus seluruh dokumen sisa di koleksi 'queue' agar esok harinya papan penjemputan bersih.
- */
-exports.autoResetQueue = onSchedule(
-  {
-    schedule: "59 23 * * *",
-    timeZone: "Asia/Jakarta",
-  },
-  async (event) => {
-    const queueRef = db.collection("queue");
-    const snapshot = await queueRef.get();
-
-    if (snapshot.empty) {
-      console.log("Antrean sudah bersih, tidak ada dokumen yang dihapus.");
-      return;
-    }
-
-    const batch = db.batch();
-    snapshot.docs.forEach((doc) => {
-      batch.delete(doc.ref);
-    });
-
-    await batch.commit();
-    console.log(`Berhasil mereset ${snapshot.size} antrean sisa hari ini.`);
-  }
-);
 
 /* ---------- fungsi admin di bawah ini WAJIB login (Firebase Auth) ---------- */
 function requireAuth(request) {
@@ -260,3 +246,19 @@ exports.adminDeleteStudent = onCall(async (request) => {
   await db.doc(`students_private/${studentId}`).delete();
   return { ok: true };
 });
+
+/**
+ * resetQueueDaily — jadwal otomatis, jalan sendiri setiap tengah malam
+ * (00:00 WIB). Menghapus semua antrean penjemputan supaya Layar Kelas
+ * mulai bersih lagi tiap hari — guru tidak perlu membersihkan manual.
+ */
+exports.resetQueueDaily = onSchedule(
+  { schedule: "0 0 * * *", timeZone: "Asia/Jakarta" },
+  async (event) => {
+    const snap = await db.collection("queue").get();
+    if (snap.empty) return;
+    const batch = db.batch();
+    snap.docs.forEach((docSnap) => batch.delete(docSnap.ref));
+    await batch.commit();
+  }
+);

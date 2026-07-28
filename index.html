@@ -4,112 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#0F1C2E">
-
-<!-- Integration Web App Manifest (PWA) -->
-<link rel="manifest" href="manifest.json">
-
-<!-- Meta Tag iOS / Android Shortcut -->
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Penjemputan">
-
-<title>Aplikasi Penjemputan — An Nashir Islamic School</title>
+<title>Jemput — An Nashir Islamic School</title>
 <link rel="icon" href="logo.png">
-<link rel="apple-touch-icon" href="logo.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
-
-<style>
-  .multi-bar {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    background: #f8fafc;
-    border: 1px solid #e2e8f0;
-    padding: 10px 14px;
-    border-radius: 12px;
-    margin-bottom: 12px;
-  }
-  .multi-bar-label {
-    font-size: 13px;
-    font-weight: 600;
-    color: #334155;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    cursor: pointer;
-  }
-  .multi-bar-label input[type="checkbox"], .checkbox-custom {
-    width: 18px;
-    height: 18px;
-    accent-color: #0F1C2E;
-    cursor: pointer;
-  }
-  
-  .floating-action-bar {
-    position: fixed;
-    bottom: 20px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: calc(100% - 32px);
-    max-width: 480px;
-    background: #0F1C2E;
-    color: #ffffff;
-    padding: 12px 20px;
-    border-radius: 30px;
-    box-shadow: 0 10px 25px -5px rgba(15, 28, 46, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    z-index: 99;
-    animation: slideUp 0.3s ease-out;
-  }
-  .floating-action-text {
-    font-size: 14px;
-    font-weight: 600;
-  }
-  .floating-action-btn {
-    background: #2563eb;
-    color: #ffffff;
-    border: none;
-    padding: 8px 16px;
-    border-radius: 20px;
-    font-size: 13px;
-    font-weight: 700;
-    cursor: pointer;
-  }
-  .floating-action-btn:active {
-    transform: scale(0.96);
-  }
-
-  .step-indicator {
-    background: #e2e8f0;
-    color: #334155;
-    font-size: 11px;
-    font-weight: 700;
-    padding: 4px 8px;
-    border-radius: 6px;
-    display: inline-block;
-    margin-bottom: 6px;
-  }
-
-  .status-badge-mini {
-    font-size: 11px;
-    font-weight: 700;
-    padding: 2px 6px;
-    border-radius: 4px;
-    display: inline-block;
-    margin-left: 6px;
-  }
-  .status-badge-mini.waiting { background: #fef3c7; color: #b45309; }
-  .status-badge-mini.done { background: #dcfce7; color: #15803d; }
-
-  @keyframes slideUp {
-    from { transform: translate(-50%, 100%); opacity: 0; }
-    to { transform: translate(-50%, 0); opacity: 1; }
-  }
-</style>
 </head>
 <body>
 
@@ -117,15 +16,14 @@
   <div class="topbar-brand">
     <div class="topbar-logo"><img src="logo.png" alt="Logo An Nashir Islamic School"></div>
     <div>
-      <div class="topbar-name">Aplikasi Penjemputan</div>
-      <div class="topbar-sub">An Nashir Islamic School (Primary)</div>
+      <div class="topbar-name">Jemput</div>
+      <div class="topbar-sub">An Nashir Islamic School (SD)</div>
     </div>
   </div>
 </div>
 
 <div class="page-wrap">
 
-  <!-- Status Lokasi GPS -->
   <div class="geo-pill" id="geo-pill">
     <div class="geo-dot" id="geo-dot"></div>
     <div>
@@ -135,21 +33,13 @@
     <button class="geo-retry" id="geo-retry" style="display:none;" onclick="checkLocation()">Coba lagi</button>
   </div>
 
-  <!-- Bagikan Tautan Penjemputan -->
-  <button class="share-btn" onclick="sharePickupLink()">
-    <span>📲 Bagikan Tautan Penjemputan</span>
-  </button>
-
   <div id="body-content">
-    <div class="empty-state">Memuat data…</div>
+    <div class="empty-state">Memuat…</div>
   </div>
 
 </div>
 
-<!-- Floating Action Bar untuk Multi-Select -->
-<div id="floating-bar-container"></div>
-
-<!-- PIN SHEET MODAL -->
+<!-- PIN SHEET -->
 <div class="sheet-overlay" id="sheet-overlay">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -158,47 +48,53 @@
 </div>
 
 <script type="module">
-import { listenRoster, listenQueue, submitPickup, changeFamilyPin } from "./firebase-config.js";
+import { listenRoster, listenQueue, submitPickup, changeFamilyPin, listenQueueEntry } from "./firebase-config.js";
 
 let ROSTER = [];
 let QUEUE = [];
 let coords = null;
-let selectedStudents = []; 
-let currentStudentIndex = 0; // Index antrean verifikasi PIN bertahap
-let successfulPickups = [];  // Menyimpan data siswa yang PIN-nya berhasil divalidasi
+let selectedStudent = null;
 let pin = '';
 let pickerName = '';
-let mode = 'jemput'; 
-let isMultiSelectMode = false; 
-let selectedClassFilter = 'ALL'; 
+let attempts = 0;
+const MAX_ATTEMPTS = 3;
+let mode = 'jemput'; // 'jemput' | 'gantipin'
 let cpStudent = null;
-let cpStage = 'current';
+let cpStage = 'current'; // 'current' | 'new' | 'confirm'
 let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
+let unsubWaiting = null; // listener aktif untuk layar status "menunggu dipanggil"
 
-// Share Link
-window.sharePickupLink = async function sharePickupLink() {
-  const shareData = {
-    title: 'Aplikasi Penjemputan An Nashir',
-    text: 'Tautan Penjemputan Siswa An Nashir Islamic School:',
-    url: window.location.origin + window.location.pathname
-  };
-
-  if (navigator.share) {
-    try { await navigator.share(shareData); } catch (err) {}
-  } else {
-    try {
-      await navigator.clipboard.writeText(shareData.url);
-      alert('Tautan penjemputan berhasil disalin!');
-    } catch (err) {}
+/* ---------------- SUARA NOTIFIKASI (dibuat langsung, tanpa file audio) ---------------- */
+let notifAudioCtx = null;
+function warmUpAudio(){
+  // Dipanggil saat orang tua mengetuk keypad (aksi sentuh sungguhan) supaya
+  // browser mengizinkan bunyi diputar nanti walau tanpa ketukan baru —
+  // beberapa browser (terutama iPhone) mewajibkan audio "dinyalakan" lewat
+  // interaksi pengguna dulu sebelum bisa diputar otomatis di kemudian hari.
+  if(!notifAudioCtx){
+    try{ notifAudioCtx = new (window.AudioContext || window.webkitAudioContext)(); }
+    catch(e){ notifAudioCtx = null; }
   }
-};
-
-const AVATAR_COLORS = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669', '#0891b2', '#4f46e5', '#d97706'];
-function getAvatarBgColor(name) {
-  let hash = 0;
-  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
+}
+function playTone(ctx, freq, startTime, duration){
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = 'sine';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.0001, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.35, startTime + 0.02);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startTime + duration);
+  osc.connect(gain).connect(ctx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration + 0.05);
+}
+function playCallNotifSound(){
+  if(!notifAudioCtx) return;
+  if(notifAudioCtx.state === 'suspended') notifAudioCtx.resume();
+  const now = notifAudioCtx.currentTime;
+  playTone(notifAudioCtx, 880, now, 0.18);
+  playTone(notifAudioCtx, 1175, now + 0.2, 0.24);
 }
 
 /* ---------------- GEOLOCATION ---------------- */
@@ -219,6 +115,10 @@ window.checkLocation = function checkLocation(){
     return;
   }
 
+  // GPS di HP butuh beberapa detik untuk menyempurnakan akurasinya.
+  // Alih-alih memakai bacaan pertama (yang sering meleset jauh), kita
+  // dengarkan beberapa bacaan selama beberapa detik dan pakai yang
+  // paling akurat (nilai `accuracy` paling kecil).
   let best = null;
   let watchId = null;
   let finished = false;
@@ -226,7 +126,7 @@ window.checkLocation = function checkLocation(){
   function finish(){
     if(finished) return;
     finished = true;
-    if(watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
+    if(watchId !== null) navigator.geolocation.clearWatch(watchId);
     if(best){
       coords = best;
       dot.className='geo-dot ok';
@@ -243,56 +143,34 @@ window.checkLocation = function checkLocation(){
 
   watchId = navigator.geolocation.watchPosition(
     (pos)=>{
-      if(!best || pos.coords.accuracy < best.accuracy) best = pos.coords;
-      if(pos.coords.accuracy <= 30) finish();
+      if(!best || pos.coords.accuracy < best.accuracy){
+        best = pos.coords;
+      }
+      if(pos.coords.accuracy <= 30){
+        finish(); // sudah cukup akurat, tidak perlu menunggu lebih lama
+      }
     },
-    (err)=>{ if(!best) finish(); },
+    (err)=>{
+      if(!best) finish();
+    },
     { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
   );
-  setTimeout(finish, 6000);
+
+  setTimeout(finish, 6000); // batas atas menunggu, pakai bacaan terbaik yang ada
 }
 checkLocation();
 
-/* ---------------- ROSTER + QUEUE ---------------- */
+/* ---------------- ROSTER + QUEUE (real-time) ---------------- */
 listenRoster((list)=>{ ROSTER = list; renderBody(); });
-listenQueue((list)=>{ 
-  QUEUE = list; 
-  renderBody(); 
-  // Update tampilan modal penjemputan secara realtime jika sedang terbuka
-  if (successfulPickups.length > 0 && document.getElementById('sheet-overlay').classList.contains('open')) {
-    updateWaitingScreenStatus();
-  }
-});
+listenQueue((list)=>{ QUEUE = list; renderBody(); });
 
 function renderBody(){
   const el = document.getElementById('body-content');
-  const classes = ['ALL', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
-
   el.innerHTML = `
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
       <input class="search-input" id="search-input" placeholder="Cari nama anak…" oninput="filterList()">
     </div>
-
-    <!-- Toggle Mode Jemput Lebih Dari 1 Anak -->
-    ${mode === 'jemput' ? `
-      <div class="multi-bar">
-        <label class="multi-bar-label">
-          <input type="checkbox" id="multi-toggle" ${isMultiSelectMode ? 'checked' : ''} onchange="toggleMultiSelect(this.checked)">
-          Jemput lebih dari 1 anak sekaligus
-        </label>
-      </div>
-    ` : ''}
-
-    <!-- Filter Bar Kelas P1 - P6 -->
-    <div class="class-filter-wrap">
-      ${classes.map(c => `
-        <button class="filter-chip ${selectedClassFilter === c ? 'active' : ''}" onclick="setClassFilter('${c}')">
-          ${c === 'ALL' ? 'Semua Kelas' : 'Kelas ' + c}
-        </button>
-      `).join('')}
-    </div>
-
     ${mode === 'gantipin' ? `
       <div class="mode-banner">
         <span>🔑 Mode Ganti PIN aktif — pilih nama anak untuk mengganti PIN keluarganya</span>
@@ -305,186 +183,70 @@ function renderBody(){
     </div>
     <div class="student-list" id="student-list"></div>
   `;
-  filterList();
+  renderStudentList(ROSTER);
+  document.getElementById('search-input').oninput = filterList;
 }
-
-window.toggleMultiSelect = function toggleMultiSelect(checked) {
-  isMultiSelectMode = checked;
-  selectedStudents = [];
-  renderFloatingBar();
-  filterList();
-};
-
-window.setClassFilter = function setClassFilter(cls) {
-  selectedClassFilter = cls;
-  renderBody();
-  window.scrollTo({ top: 0, behavior: 'smooth' });
-};
-
 window.toggleChangePinMode = function toggleChangePinMode(){
   mode = mode === 'jemput' ? 'gantipin' : 'jemput';
-  isMultiSelectMode = false;
-  selectedStudents = [];
-  renderFloatingBar();
   renderBody();
-};
-
-window.filterList = function filterList(){
-  const searchInput = document.getElementById('search-input');
-  const q = searchInput ? searchInput.value.toLowerCase().trim().replace(/\s+/g, ' ') : '';
-  
-  let filtered = [...ROSTER];
-  if (selectedClassFilter !== 'ALL') {
-    filtered = filtered.filter(s => String(s.class).toUpperCase().includes(selectedClassFilter));
-  }
-  if (q) {
-    filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
-  }
-  filtered.sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
-
-  renderStudentList(filtered);
-};
-
+}
+function filterList(){
+  const q = document.getElementById('search-input').value.toLowerCase();
+  renderStudentList(ROSTER.filter(s => s.name.toLowerCase().includes(q)));
+}
 function renderStudentList(list){
   const el = document.getElementById('student-list');
   if(!el) return;
-
-  if(ROSTER.length === 0){
-    el.innerHTML = [1, 2, 3, 4].map(() => `
-      <div class="skeleton-row">
-        <div class="skeleton-avatar"></div>
-        <div class="skeleton-text-group">
-          <div class="skeleton-line long"></div>
-          <div class="skeleton-line short"></div>
-        </div>
-      </div>
-    `).join('');
+  if(list.length===0){
+    el.innerHTML = `<div class="empty-state">${ROSTER.length===0 ? 'Memuat daftar siswa…' : 'Tidak ditemukan.'}</div>`;
     return;
   }
-
-  if(list.length === 0){
-    el.innerHTML = `<div class="empty-state">Tidak ditemukan.</div>`;
-    return;
-  }
-
   el.innerHTML = list.map(s=>{
     const called = mode === 'jemput' && QUEUE.find(q=>q.studentId===s.id);
     const initials = s.name.split(' ').slice(0,2).map(w=>w[0]).join('');
-    const avatarBg = getAvatarBgColor(s.name);
-    const isChecked = selectedStudents.some(item => item.id === s.id);
-    
-    let onClickAttr = '';
-    if (!called) {
-      if (mode === 'gantipin') {
-        onClickAttr = `onclick="openChangePin('${s.id}')"`;
-      } else if (isMultiSelectMode) {
-        onClickAttr = `onclick="toggleSelectStudent('${s.id}')"`;
-      } else {
-        onClickAttr = `onclick="openPinSingle('${s.id}')"`;
-      }
-    }
-
+    const handler = mode === 'jemput' ? `openPin('${s.id}')` : `openChangePin('${s.id}')`;
     return `
-    <div class="student-row ${called?'disabled':''}" ${onClickAttr}>
+    <div class="student-row ${called?'disabled':''}" ${called?'':`onclick="${handler}"`}>
       <div class="student-left">
-        ${isMultiSelectMode && mode === 'jemput' && !called ? `
-          <input type="checkbox" class="checkbox-custom" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleSelectStudent('${s.id}')">
-        ` : ''}
-        <div class="avatar" style="background-color: ${avatarBg};">${initials}</div>
+        <div class="avatar">${initials}</div>
         <div>
           <div class="student-name">${s.name}</div>
           <div class="student-class">Kelas ${s.class}</div>
         </div>
       </div>
-      ${called ? `<span class="status-tag">Sudah dipanggil</span>` : (
-        isMultiSelectMode && mode === 'jemput' ? '' : `<span class="chevron">${mode==='gantipin' ? '🔑' : '›'}</span>`
-      )}
+      ${called ? `<span class="status-tag">Sudah dipanggil</span>` : `<span class="chevron">${mode==='gantipin' ? '🔑' : '›'}</span>`}
     </div>`;
   }).join('');
 }
 
-// Toggle Seleksi Siswa Multi-Select
-window.toggleSelectStudent = function toggleSelectStudent(id) {
-  const student = ROSTER.find(s => s.id === id);
-  if (!student) return;
-
-  const idx = selectedStudents.findIndex(s => s.id === id);
-  if (idx > -1) {
-    selectedStudents.splice(idx, 1);
-  } else {
-    selectedStudents.push(student);
-  }
-  renderFloatingBar();
-  filterList();
-};
-
-function renderFloatingBar() {
-  const container = document.getElementById('floating-bar-container');
-  if (!isMultiSelectMode || selectedStudents.length === 0) {
-    container.innerHTML = '';
-    return;
-  }
-
-  container.innerHTML = `
-    <div class="floating-action-bar">
-      <div class="floating-action-text">${selectedStudents.length} Siswa Terpilih</div>
-      <button class="floating-action-btn" onclick="openPinMulti()">Lanjut Jemput ›</button>
-    </div>
-  `;
-}
-
-/* ---------------- VERIFIKASI PIN SEQUENTIAL ---------------- */
-window.openPinSingle = function openPinSingle(id){
-  const student = ROSTER.find(s => s.id === id);
-  if(student) {
-    selectedStudents = [student];
-    startPickupFlow();
-  }
-};
-
-window.openPinMulti = function openPinMulti(){
-  if(selectedStudents.length === 0) return;
-  startPickupFlow();
-};
-
-function startPickupFlow(){
-  currentStudentIndex = 0;
-  successfulPickups = [];
-  pin = ''; 
-  pickerName = '';
+/* ---------------- PIN SHEET ---------------- */
+window.openPin = function openPin(id){
+  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
+  selectedStudent = ROSTER.find(s=>s.id===id);
+  pin=''; attempts=0; pickerName='';
   renderPinSheet();
   document.getElementById('sheet-overlay').classList.add('open');
   setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
 }
-
 window.closeSheet = function closeSheet(){
   document.getElementById('sheet-overlay').classList.remove('open');
+  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
 }
-
-window.updatePickerName = function updatePickerName(v){ pickerName = v; };
-
+window.updatePickerName = function updatePickerName(v){
+  pickerName = v;
+}
 function renderPinSheet(pinErr, nameErr){
   const c = document.getElementById('sheet-content');
   const safeName = pickerName.replace(/"/g,'&quot;');
-  
-  const currentStudent = selectedStudents[currentStudentIndex];
-  const isMulti = selectedStudents.length > 1;
-
   c.innerHTML = `
     <div class="sheet-title">Verifikasi Penjemputan</div>
-    
-    ${isMulti ? `<div class="step-indicator">Siswa ${currentStudentIndex + 1} dari ${selectedStudents.length}</div>` : ''}
-    
-    <div class="sheet-sub">
-      Masukkan PIN untuk: <br><strong style="font-size:16px; color:#0F1C2E;">${currentStudent.name}</strong> (Kelas ${currentStudent.class})
-    </div>
+    <div class="sheet-sub">Untuk menjemput <b>${selectedStudent.name}</b> · Kelas ${selectedStudent.class}</div>
 
-    <!-- Nama penjemput diisi 1x di awal -->
-    <div class="field-label" style="margin-top:8px;">Nama penjemput <span style="color:var(--coral);">*wajib diisi</span></div>
-    <input class="text-input" id="picker-name" value="${safeName}" ${currentStudentIndex > 0 ? 'readonly style="background:#f1f5f9;"' : ''} oninput="updatePickerName(this.value)" placeholder="cth: Budi (Ojek Online) / Nenek">
+    <div class="field-label" style="margin-top:2px;">Nama penjemput <span style="color:var(--coral);">*wajib diisi</span></div>
+    <input class="text-input" id="picker-name" value="${safeName}" oninput="updatePickerName(this.value)" placeholder="cth: Budi (Ojek Online) / Nenek">
     <div class="pin-error">${nameErr||''}</div>
 
-    <div class="field-label" style="margin-top:10px; text-align:center;">PIN (${currentStudent.name})</div>
+    <div class="field-label" style="margin-top:10px; text-align:center;">Masukkan PIN Penjemputan</div>
     <div class="pin-dots" id="pin-dots">
       ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<pin.length?'filled':''}"></div>`).join('')}
     </div>
@@ -497,8 +259,8 @@ function renderPinSheet(pinErr, nameErr){
     </div>
   `;
 }
-
 window.pressKey = function pressKey(n){
+  warmUpAudio();
   if(!pickerName.trim()){
     renderPinSheet('', 'Isi nama penjemput dulu sebelum memasukkan PIN.');
     document.getElementById('picker-name')?.focus();
@@ -508,13 +270,11 @@ window.pressKey = function pressKey(n){
   pin += n;
   renderPinSheet();
   if(pin.length===4) checkPin();
-};
-
+}
 window.backspace = function backspace(){
   pin = pin.slice(0,-1);
   renderPinSheet();
-};
-
+}
 async function checkPin(){
   if(!pickerName.trim()){
     pin='';
@@ -522,62 +282,44 @@ async function checkPin(){
     document.getElementById('picker-name')?.focus();
     return;
   }
-  
   const dotsEl = document.getElementById('pin-dots');
   const c = document.getElementById('sheet-content');
   c.style.opacity='.5'; c.style.pointerEvents='none';
 
-  const currentStudent = selectedStudents[currentStudentIndex];
-  let res;
-
-  try {
-    res = await submitPickup(currentStudent.id, pin, pickerName.trim(), coords);
-  } catch(e) {
+  let result;
+  try{
+    result = await submitPickup(selectedStudent.id, pin, pickerName.trim(), coords);
+  }catch(e){
     c.style.opacity='1'; c.style.pointerEvents='auto';
     pin='';
-    renderPinSheet('Gagal menghubungi server.');
+    renderPinSheet('Gagal menghubungi server. Periksa koneksi internet Anda.');
     return;
   }
-
   c.style.opacity='1'; c.style.pointerEvents='auto';
 
-  if(res.ok) {
-    successfulPickups.push({ student: currentStudent, queueId: res.queueId });
-    
-    currentStudentIndex++;
-    
-    if(currentStudentIndex < selectedStudents.length) {
-      // Masih ada siswa lain, minta PIN siswa berikutnya secara sequential
-      pin = '';
-      renderPinSheet();
-    } else {
-      // Semua siswa berhasil diproses
-      selectedStudents = [];
-      renderFloatingBar();
-      showWaitingScreen();
-    }
+  if(result.ok){
+    showWaitingScreen(result.queueId);
     return;
   }
 
-  // Penanganan kegagalan PIN
   pin='';
   if(dotsEl) dotsEl.classList.add('shake');
 
   const messages = {
-    wrong_pin: `PIN salah untuk ${currentStudent.name}. ${res.attemptsLeft!=null ? `Sisa percobaan: ${res.attemptsLeft}.` : ''}`,
-    locked: null,
+    wrong_pin: `PIN salah. ${result.attemptsLeft!=null ? `Percobaan tersisa: ${result.attemptsLeft}.` : ''}`,
+    locked: null, // shown as lockout box below
     out_of_range: null,
-    already_queued: `${currentStudent.name} sudah ada di antrean penjemputan.`,
+    already_queued: 'Siswa ini sudah masuk antrean penjemputan.',
   };
 
-  if(res.reason === 'locked'){
+  if(result.reason==='locked'){
     c.innerHTML = `
       <div class="sheet-title">Verifikasi terkunci</div>
-      <div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${currentStudent.name}.</div>
-      <div class="lockout-box">🔒 Akses terkunci sementara. Hubungi guru piket di gerbang.</div>
+      <div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${selectedStudent.name}.</div>
+      <div class="lockout-box">🔒 Demi keamanan, akun ini dikunci sementara. Silakan hubungi <b>guru piket di gerbang</b> untuk verifikasi manual.</div>
       <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
     `;
-  } else if(res.reason === 'out_of_range'){
+  } else if(result.reason==='out_of_range'){
     c.innerHTML = `
       <div class="sheet-title">Diluar radius sekolah</div>
       <div class="sheet-sub">Lokasi Anda saat ini terlalu jauh dari gerbang sekolah.</div>
@@ -585,90 +327,71 @@ async function checkPin(){
       <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
     `;
   } else {
-    renderPinSheet(messages[res.reason] || 'Gagal memproses penjemputan.');
+    renderPinSheet(messages[result.reason] || 'Terjadi kesalahan, coba lagi.');
   }
 }
-
-function showWaitingScreen(){
+function showWaitingScreen(queueId){
+  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
   const c = document.getElementById('sheet-content');
-  c.innerHTML = `
-    <div class="success-wrap">
-      <div class="success-icon waiting-icon" id="modal-status-icon">⏳</div>
-      <div class="success-title" id="modal-status-title">Berhasil Masuk Antrean</div>
-      <div class="success-sub">Permintaan penjemputan berhasil dikirim untuk:</div>
-      <div id="modal-student-list" style="margin:12px 0; text-align:left; background:#f8fafc; padding:12px; border-radius:10px; font-size:14px; line-height:1.8; color:#1e293b;">
-      </div>
-      <div class="success-sub" id="modal-status-sub">Silakan menunggu anak-anak dipanggil oleh guru piket di gerbang.</div>
-      
-      <!-- Tombol ini disembunyikan sampai monitor memanggil SEMUA anak -->
-      <button class="sheet-btn" id="done-close-btn" style="margin-top:14px; display:none;" onclick="closeSheet()">Selesai & Tutup</button>
-    </div>
-  `;
-  updateWaitingScreenStatus();
-}
+  let lastStatus = null;
 
-function updateWaitingScreenStatus(){
-  const listEl = document.getElementById('modal-student-list');
-  const doneBtn = document.getElementById('done-close-btn');
-  const iconEl = document.getElementById('modal-status-icon');
-  const titleEl = document.getElementById('modal-status-title');
-  const subEl = document.getElementById('modal-status-sub');
-  
-  if (!listEl) return;
-
-  let allCalled = true;
-
-  const namesHtml = successfulPickups.map(p => {
-    // Cek apakah siswa masih berada di QUEUE (antrean aktif)
-    const inQueue = QUEUE.find(q => q.studentId === p.student.id || q.id === p.queueId);
-    
-    // Jika tidak ada di QUEUE, atau status di QUEUE bernilai 'called'/'done', berarti sudah dipanggil
-    const isCalled = !inQueue || (inQueue && (inQueue.status === 'called' || inQueue.status === 'done'));
-
-    if (!isCalled) {
-      allCalled = false; // Masih ada minimal 1 anak yang belum dipanggil
+  unsubWaiting = listenQueueEntry(queueId, (entry)=>{
+    if(!entry){
+      // Dokumen sudah dihapus guru = anak sudah selesai diserahkan
+      c.innerHTML = `
+        <div class="success-wrap">
+          <div class="success-icon">🎉</div>
+          <div class="success-title">Penjemputan Selesai</div>
+          <div class="success-sub">Terima kasih. <b>${selectedStudent.name}</b> sudah diserahkan kepada penjemput.</div>
+          <button class="sheet-btn" onclick="closeSheet()">Tutup</button>
+        </div>
+      `;
+      if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
+      return;
     }
 
-    return `
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
-        <span>• <b>${p.student.name}</b> (Kelas ${p.student.class})</span>
-        ${isCalled 
-          ? `<span class="status-badge-mini done">✓ Dipanggil</span>` 
-          : `<span class="status-badge-mini waiting">⏳ Antrean</span>`}
-      </div>
-    `;
-  }).join('');
+    if(entry.status === 'called' && lastStatus !== 'called'){
+      if(navigator.vibrate) navigator.vibrate([250,120,250,120,250]);
+      playCallNotifSound();
+    }
+    lastStatus = entry.status;
 
-  listEl.innerHTML = namesHtml;
-
-  // Kontrol tampilan tombol & status berdasarkan sinyal dari monitor
-  if (allCalled) {
-    if (doneBtn) doneBtn.style.display = 'block'; // Tampilkan tombol
-    if (iconEl) iconEl.textContent = '✓';
-    if (titleEl) titleEl.textContent = 'Siswa Siap DiJemput';
-    if (subEl) subEl.textContent = 'Anak-anak sudah dipanggil oleh guru piket. Silakan ambil siswa di gerbang.';
-  } else {
-    if (doneBtn) doneBtn.style.display = 'none'; // Sembunyikan tombol
-    if (iconEl) iconEl.textContent = '⏳';
-    if (titleEl) titleEl.textContent = 'Berhasil Masuk Antrean';
-    if (subEl) subEl.textContent = 'Silakan menunggu anak-anak dipanggil oleh guru piket di gerbang.';
-  }
+    if(entry.status === 'called'){
+      c.innerHTML = `
+        <div class="success-wrap">
+          <div class="success-icon called-icon">🔔</div>
+          <div class="success-title">Anak Anda Sudah Keluar!</div>
+          <div class="success-sub">Silakan sambut <b>${entry.name}</b> di gerbang sekarang.</div>
+          <div class="success-name">Kelas ${entry.class}</div>
+          <button class="sheet-btn" onclick="closeSheet()">Tutup</button>
+        </div>
+      `;
+    } else {
+      c.innerHTML = `
+        <div class="success-wrap">
+          <div class="success-icon waiting-icon">⏳</div>
+          <div class="success-title">Menunggu Dipanggil</div>
+          <div class="success-sub">Anak Anda segera dipanggil oleh guru. Halaman ini otomatis update — silakan tunggu di luar atau di mobil, tanpa perlu menutup halaman ini.</div>
+          <div class="success-name">Menjemput <b>${entry.name}</b><br><span style="font-size:12px;color:var(--slate);">Kelas ${entry.class}</span></div>
+          <button class="sheet-btn ghost" onclick="closeSheet()">Tutup jendela ini</button>
+        </div>
+      `;
+    }
+  });
 }
 
-/* ---------------- FITUR GANTI PIN ---------------- */
+/* ---------------- GANTI PIN (3 tahap: PIN lama → PIN baru → konfirmasi) ---------------- */
 window.openChangePin = function openChangePin(id){
   cpStudent = ROSTER.find(s=>s.id===id);
   cpStage = 'current'; cpPin = ''; cpVals = { current:'', new:'', confirm:'' };
   renderChangePinSheet();
   document.getElementById('sheet-overlay').classList.add('open');
-};
-
+}
 const CP_LABELS = {
   current: { title: 'Verifikasi PIN Lama', sub: (n)=>`Masukkan PIN keluarga yang berlaku saat ini untuk ${n}` },
-  new:      { title: 'Buat PIN Baru',       sub: ()=>'Masukkan PIN baru (4 digit)' },
+  new:     { title: 'Buat PIN Baru',       sub: ()=>'Masukkan PIN baru (4 digit)' },
   confirm: { title: 'Konfirmasi PIN Baru', sub: ()=>'Ulangi sekali lagi PIN baru untuk konfirmasi' },
 };
-
 function renderChangePinSheet(err){
   const c = document.getElementById('sheet-content');
   const { title, sub } = CP_LABELS[cpStage];
@@ -687,19 +410,17 @@ function renderChangePinSheet(err){
     </div>
   `;
 }
-
 window.cpPressKey = function cpPressKey(n){
+  warmUpAudio();
   if(cpPin.length>=4) return;
   cpPin += n;
   renderChangePinSheet();
   if(cpPin.length===4) cpAdvance();
-};
-
+}
 window.cpBackspace = function cpBackspace(){
   cpPin = cpPin.slice(0,-1);
   renderChangePinSheet();
-};
-
+}
 async function cpAdvance(){
   if(cpStage === 'current'){
     cpVals.current = cpPin; cpPin = ''; cpStage = 'new';
@@ -711,6 +432,7 @@ async function cpAdvance(){
     renderChangePinSheet();
     return;
   }
+  // stage === 'confirm'
   cpVals.confirm = cpPin;
   if(cpVals.new !== cpVals.confirm){
     cpPin = ''; cpStage = 'new';
