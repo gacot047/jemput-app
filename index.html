@@ -326,7 +326,7 @@ window.selectClassFilter = function selectClassFilter(c){
   renderBody();
 }
 
-/* ---------------- LOGIKA PENCARIAN FLEKSIBEL ---------------- */
+/* ---------------- LOGIKA PENCARIAN FLEKSIBEL & URUT ABJAD ---------------- */
 window.filterList = function filterList(){
   const searchInput = document.getElementById('search-input');
   searchQuery = searchInput ? searchInput.value : '';
@@ -340,6 +340,9 @@ window.filterList = function filterList(){
     
     return matchName && matchClass;
   });
+
+  // Urutkan daftar siswa secara rapi sesuai abjad (A - Z)
+  filtered.sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
 
   renderStudentList(filtered);
 }
