@@ -43,6 +43,28 @@ body {
   top: 0;
   z-index: 100;
   box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.topbar-action {
+  background: rgba(255, 255, 255, 0.08);
+  color: #FFFFFF;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 10px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background 0.2s ease;
+}
+
+.topbar-action:hover {
+  background: rgba(255, 255, 255, 0.16);
 }
 
 .topbar-brand {
@@ -79,6 +101,10 @@ body {
   margin: 0 auto;
   width: 100%;
   padding: 16px;
+}
+
+.page-wrap.wide {
+  max-width: 900px;
 }
 
 /* ---------------- BAR GPS / GEOLOCATION ---------------- */
@@ -722,4 +748,285 @@ body {
 
 .shake {
   animation: shake 0.3s ease-in-out;
+}
+
+/* ==========================================================================
+   TAMBAHAN — dipakai admin.html (gerbang login & dashboard kelola sekolah)
+   dan 2 kotak peringatan di index.html yang sebelumnya belum ada definisinya.
+   Ditambahkan tanpa mengubah rules yang sudah ada di atas.
+   ========================================================================== */
+
+/* ---------------- WARNING BOX (index.html: PIN terkunci / di luar radius) ---------------- */
+.lockout-box {
+  margin-top: 14px;
+  background: #FEF2F2;
+  border: 1px solid #FECACA;
+  color: #B91C1C;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.warn-box {
+  margin-top: 14px;
+  background: #FFFBEB;
+  border: 1px solid #FDE68A;
+  color: #92400E;
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  text-align: left;
+}
+
+.success-icon.called-icon { color: var(--success-color); }
+.success-icon.waiting-icon { color: #D97706; }
+
+/* ---------------- LOGIN GATE (admin.html) ---------------- */
+.login-wrap {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 65vh;
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 32px 26px;
+  text-align: center;
+  box-shadow: var(--shadow-md);
+  margin: 0 auto;
+}
+
+.lock-icon {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  background: var(--brand-blue-soft);
+  color: var(--brand-blue);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin: 0 auto 14px;
+}
+
+.login-hint {
+  font-size: 11.5px;
+  color: var(--text-subtle);
+  margin-top: 14px;
+  line-height: 1.5;
+}
+
+.reset-link {
+  display: block;
+  margin: 12px auto 0;
+  background: none;
+  border: none;
+  color: var(--brand-blue);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* ---------------- ADMIN DASHBOARD ---------------- */
+.admin-title {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 19px;
+  font-weight: 800;
+  color: var(--text-main);
+}
+
+.admin-sub {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  margin-bottom: 16px;
+}
+
+.admin-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow-sm);
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr .8fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.admin-field label {
+  display: block;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-subtle);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+}
+
+.admin-field select,
+.admin-field input {
+  width: 100%;
+  padding: 10px 11px;
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  font-size: 13.5px;
+  font-family: inherit;
+  outline: none;
+}
+
+.admin-field select:focus,
+.admin-field input:focus {
+  border-color: var(--navy-primary);
+}
+
+.admin-add-btn {
+  padding: 10px 16px;
+  border: none;
+  border-radius: 10px;
+  background: var(--navy-primary);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 13px;
+  cursor: pointer;
+  white-space: nowrap;
+  height: 41px;
+}
+
+.admin-add-btn:disabled {
+  background: var(--text-subtle);
+  cursor: not-allowed;
+}
+
+.admin-class-group {
+  margin-top: 6px;
+}
+
+.admin-class-heading {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--brand-blue);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 16px 0 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-class-heading::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.admin-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 4px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.admin-row:last-child {
+  border-bottom: none;
+}
+
+.admin-row-name {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-main);
+}
+
+.admin-row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pin-badge {
+  font-family: 'Space Grotesk', sans-serif;
+  font-size: 12px;
+  font-weight: 700;
+  background: #F8FAFC;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 5px 10px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.pin-badge:hover {
+  border-color: var(--navy-primary);
+  color: var(--navy-primary);
+}
+
+.icon-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+  border: 1px solid var(--border-color);
+  background: #FFFFFF;
+  color: var(--coral-danger);
+  cursor: pointer;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s ease;
+}
+
+.icon-btn:hover {
+  background: #FEF2F2;
+}
+
+.admin-empty {
+  text-align: center;
+  color: var(--text-subtle);
+  font-size: 12.5px;
+  padding: 20px;
+}
+
+.toast {
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 10px;
+  min-height: 16px;
+}
+
+.toast.ok { color: var(--success-color); }
+.toast.err { color: var(--coral-danger); }
+
+.footnote {
+  max-width: 900px;
+  margin: 16px auto 0;
+  text-align: center;
+  font-size: 11.5px;
+  color: var(--text-subtle);
+  padding: 0 20px;
+  line-height: 1.5;
+}
+
+/* ---------------- Pemanis kecil untuk elemen wrapper yang sebelumnya tanpa style ---------------- */
+.pickup-bar-info,
+.queue-child-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
