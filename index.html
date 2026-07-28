@@ -200,21 +200,21 @@ function playCallNotifSound(){
   playTone(notifAudioCtx, 1567.98, now + 0.36, 0.25); 
 }
 
-/* ---------------- GEOLOCATION ---------------- */
+/* ---------------- GEOLOCATION (DIPISAH AGAR TIDAK MEMBLOKIR RENDER) ---------------- */
 window.checkLocation = function checkLocation(){
   const dot = document.getElementById('geo-dot');
   const label = document.getElementById('geo-label');
   const sub = document.getElementById('geo-sub');
   const retry = document.getElementById('geo-retry');
-  retry.style.display='none';
-  label.textContent = 'Mengecek lokasi…';
-  sub.textContent = 'Mohon tunggu sebentar (menyempurnakan akurasi GPS)';
-  dot.className='geo-dot';
+  if(retry) retry.style.display='none';
+  if(label) label.textContent = 'Mengecek lokasi…';
+  if(sub) sub.textContent = 'Mohon tunggu sebentar (menyempurnakan akurasi GPS)';
+  if(dot) dot.className='geo-dot';
 
   if(!navigator.geolocation){
-    dot.className='geo-dot bad';
-    label.textContent='Perangkat tidak mendukung lokasi';
-    sub.textContent='Gunakan browser lain atau hubungi guru piket';
+    if(dot) dot.className='geo-dot bad';
+    if(label) label.textContent='Perangkat tidak mendukung lokasi';
+    if(sub) sub.textContent='Gunakan browser lain atau hubungi guru piket';
     return;
   }
 
@@ -228,16 +228,15 @@ window.checkLocation = function checkLocation(){
     if(watchId !== null) navigator.geolocation.clearWatch(watchId);
     if(best){
       coords = best;
-      dot.className='geo-dot ok';
-      label.textContent='Lokasi terdeteksi';
-      sub.textContent = `Akurasi ±${Math.round(best.accuracy)}m — jarak diverifikasi saat penjemputan`;
+      if(dot) dot.className='geo-dot ok';
+      if(label) label.textContent='Lokasi terdeteksi';
+      if(sub) sub.textContent = `Akurasi ±${Math.round(best.accuracy)}m — jarak diverifikasi saat penjemputan`;
     } else {
-      dot.className='geo-dot bad';
-      label.textContent='Lokasi belum ditemukan';
-      sub.textContent='Aktifkan izin lokasi lalu coba lagi';
-      retry.style.display='inline-block';
+      if(dot) dot.className='geo-dot bad';
+      if(label) label.textContent='Lokasi belum ditemukan';
+      if(sub) sub.textContent='Aktifkan izin lokasi lalu coba lagi';
+      if(retry) retry.style.display='inline-block';
     }
-    renderBody();
   }
 
   watchId = navigator.geolocation.watchPosition(
@@ -257,6 +256,8 @@ window.checkLocation = function checkLocation(){
 
   setTimeout(finish, 6000);
 }
+
+// Jalankan pengecekan lokasi di latar belakang secara independen
 checkLocation();
 
 /* ---------------- OPTIMASI READS: ROSTER (FETCH SEKALI + CACHE) & QUEUE (REAL-TIME) ---------------- */
