@@ -464,7 +464,7 @@ async function checkAndAdvanceMultiPickup(){
     } else {
       selectedStudentIds = [];
       updatePickupBar();
-      showWaitingScreen(result.queueId);
+      showWaitingScreen();
     }
     return;
   }
@@ -500,50 +500,80 @@ async function checkAndAdvanceMultiPickup(){
   }
 }
 
-function showWaitingScreen(queueId){
-  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
+/* ---------------- TAMPILAN ANTREAN REAL-TIME DENGAN STATUS PER ANAK ---------------- */
+let previousStudentStatuses = {};
+
+function showWaitingScreen() {
   const c = document.getElementById('sheet-content');
-  let lastStatus = null;
+  if (!c) return;
 
-  unsubWaiting = listenQueueEntry(queueId, (entry)=>{
-    if(!entry){
-      c.innerHTML = `
-        <div class="success-wrap">
-          <div class="success-icon">🎉</div>
-          <div class="success-title">Penjemputan Selesai</div>
-          <div class="success-sub">Anak yang Anda jemput telah diserahkan.</div>
-          <button class="sheet-btn" onclick="closeSheet(); switchMode('single');">Selesai</button>
-        </div>
-      `;
-      if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
-      return;
-    }
+  if (unsubWaiting) { unsubWaiting(); unsubWaiting = null; }
+  previousStudentStatuses = {};
 
-    if(entry.status === 'called' && lastStatus !== 'called'){
-      if(navigator.vibrate) navigator.vibrate([250,120,250,120,250]);
+  const studentIds = verifiedPickups.map(p => p.studentId);
+
+  unsubWaiting = listenQueue((queueList) => {
+    const currentStudentsData = studentIds.map(id => {
+      const rosterData = ROSTER.find(r => r.id === id) || { name: 'Siswa', class: '-' };
+      const queueData = queueList.find(q => q.studentId === id);
+      return {
+        id: id,
+        name: rosterData.name,
+        class: rosterData.class,
+        status: queueData ? queueData.status : 'completed'
+      };
+    });
+
+    let hasNewCall = false;
+    currentStudentsData.forEach(child => {
+      const prevStatus = previousStudentStatuses[child.id];
+      if (child.status === 'called' && prevStatus !== 'called') {
+        hasNewCall = true;
+      }
+      previousStudentStatuses[child.id] = child.status;
+    });
+
+    if (hasNewCall) {
+      if (navigator.vibrate) navigator.vibrate([250, 120, 250, 120, 250]);
       playCallNotifSound();
     }
-    lastStatus = entry.status;
 
-    if(entry.status === 'called'){
-      c.innerHTML = `
-        <div class="success-wrap">
-          <div class="success-icon called-icon">🔔</div>
-          <div class="success-title">Anak Anda Dipanggil!</div>
-          <div class="success-sub">Silakan menuju area gerbang untuk penjemputan.</div>
-          <button class="sheet-btn" onclick="closeSheet(); switchMode('single');">Tutup</button>
+    const allCalledOrDone = currentStudentsData.every(c => c.status === 'called' || c.status === 'completed');
+    const anyCalled = currentStudentsData.some(c => c.status === 'called');
+
+    c.innerHTML = `
+      <div class="success-wrap">
+        <div class="success-icon ${anyCalled ? 'called-icon' : 'waiting-icon'}">
+          ${allCalledOrDone ? '🎉' : anyCalled ? '🔔' : '⏳'}
         </div>
-      `;
-    } else {
-      c.innerHTML = `
-        <div class="success-wrap">
-          <div class="success-icon waiting-icon">⏳</div>
-          <div class="success-title">Dalam Antrean</div>
-          <div class="success-sub">Permintaan penjemputan berhasil. Guru piket akan memanggil nama anak Anda.</div>
-          <button class="sheet-btn ghost" onclick="closeSheet(); switchMode('single');">Tutup jendela</button>
+        
+        <div class="success-title">
+          ${allCalledOrDone ? 'Semua Anak Sudah Dipanggil!' : anyCalled ? 'Anak Dipanggil!' : 'Dalam Antrean'}
         </div>
-      `;
-    }
+        
+        <div class="success-sub">
+          ${allCalledOrDone ? 'Silakan sambut anak-anak Anda di pintu gerbang.' : 'Perhatikan daftar di bawah ini:'}
+        </div>
+
+        <div class="queue-child-list">
+          ${currentStudentsData.map(child => `
+            <div class="queue-child-card ${child.status === 'called' ? 'called' : child.status === 'completed' ? 'completed' : ''}">
+              <div class="queue-child-info">
+                <div class="queue-child-name">${child.name}</div>
+                <div class="queue-child-class">Kelas ${child.class}</div>
+              </div>
+              <div class="queue-child-badge">
+                ${child.status === 'called' ? '✅ Selesai / Dipanggil' : child.status === 'completed' ? '✔️ Diserahkan' : '⏳ Menunggu'}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+
+        <button class="sheet-btn ${allCalledOrDone ? '' : 'ghost'}" onclick="closeSheet(); switchMode('single');">
+          ${allCalledOrDone ? 'Selesai' : 'Tutup Jendela'}
+        </button>
+      </div>
+    `;
   });
 }
 
