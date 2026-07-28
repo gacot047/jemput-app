@@ -19,6 +19,83 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+
+<style>
+  /* Tambahan Style Khusus Multi-Select & Floating Bar */
+  .multi-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: #f8fafc;
+    border: 1px solid #e2e8f0;
+    padding: 10px 14px;
+    border-radius: 12px;
+    margin-bottom: 12px;
+  }
+  .multi-bar-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #334155;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+  }
+  .multi-bar-label input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #0F1C2E;
+    cursor: pointer;
+  }
+  .checkbox-custom {
+    width: 22px;
+    height: 22px;
+    accent-color: #0F1C2E;
+    cursor: pointer;
+  }
+  
+  /* Floating Bottom Bar saat memilih banyak siswa */
+  .floating-action-bar {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: calc(100% - 32px);
+    max-width: 480px;
+    background: #0F1C2E;
+    color: #ffffff;
+    padding: 12px 20px;
+    border-radius: 30px;
+    box-shadow: 0 10px 25px -5px rgba(15, 28, 46, 0.4);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    z-index: 99;
+    animation: slideUp 0.3s ease-out;
+  }
+  .floating-action-text {
+    font-size: 14px;
+    font-weight: 600;
+  }
+  .floating-action-btn {
+    background: #2563eb;
+    color: #ffffff;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 700;
+    cursor: pointer;
+  }
+  .floating-action-btn:active {
+    transform: scale(0.96);
+  }
+
+  @keyframes slideUp {
+    from { transform: translate(-50%, 100%); opacity: 0; }
+    to { transform: translate(-50%, 0); opacity: 1; }
+  }
+</style>
 </head>
 <body>
 
@@ -44,7 +121,7 @@
     <button class="geo-retry" id="geo-retry" style="display:none;" onclick="checkLocation()">Coba lagi</button>
   </div>
 
-  <!-- Tombol Bagikan Tautan Penjemputan -->
+  <!-- Bagikan Tautan Penjemputan -->
   <button class="share-btn" onclick="sharePickupLink()">
     <span>📲 Bagikan Tautan Penjemputan</span>
   </button>
@@ -54,6 +131,9 @@
   </div>
 
 </div>
+
+<!-- Floating Action Bar untuk Multi-Select -->
+<div id="floating-bar-container"></div>
 
 <!-- PIN SHEET MODAL -->
 <div class="sheet-overlay" id="sheet-overlay">
@@ -69,18 +149,19 @@ import { listenRoster, listenQueue, submitPickup, changeFamilyPin, listenQueueEn
 let ROSTER = [];
 let QUEUE = [];
 let coords = null;
-let selectedStudent = null;
+let selectedStudents = []; // Array menampung siswa yang dipilih
 let pin = '';
 let pickerName = '';
 let mode = 'jemput'; // 'jemput' | 'gantipin'
-let selectedClassFilter = 'ALL'; // 'ALL' | 'P1' | 'P2' ...
+let isMultiSelectMode = false; // Flag mode seleksi banyak
+let selectedClassFilter = 'ALL'; 
 let cpStudent = null;
-let cpStage = 'current'; // 'current' | 'new' | 'confirm'
+let cpStage = 'current';
 let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
 let unsubWaiting = null;
 
-// Fungsi Bagikan Tautan Penjemputan
+// Share Link
 window.sharePickupLink = async function sharePickupLink() {
   const shareData = {
     title: 'Aplikasi Penjemputan An Nashir',
@@ -89,62 +170,41 @@ window.sharePickupLink = async function sharePickupLink() {
   };
 
   if (navigator.share) {
-    try {
-      await navigator.share(shareData);
-    } catch (err) {
-      if (err.name !== 'AbortError') console.error('Gagal membagikan:', err);
-    }
+    try { await navigator.share(shareData); } catch (err) {}
   } else {
     try {
       await navigator.clipboard.writeText(shareData.url);
-      alert('Tautan penjemputan berhasil disalin ke clipboard!');
-    } catch (err) {
-      alert('Gagal menyalin tautan.');
-    }
+      alert('Tautan penjemputan berhasil disalin!');
+    } catch (err) {}
   }
 };
 
-// Fungsi Suara Bel Notifikasi (Tiga Nada Cepat F5 - A5 - C6)
+// Suara Chime
 function playChime() {
   try {
     const ctx = new (window.AudioContext || window.webkitAudioContext)();
     const notes = [698.46, 880.00, 1046.50];
-    
     notes.forEach((freq, index) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       const startTime = ctx.currentTime + (index * 0.12);
-      
       osc.type = 'triangle';
       osc.frequency.setValueAtTime(freq, startTime);
-      
       gain.gain.setValueAtTime(0.6, startTime);
       gain.gain.exponentialRampToValueAtTime(0.00001, startTime + 0.35);
-      
       osc.connect(gain);
       gain.connect(ctx.destination);
-      
       osc.start(startTime);
       osc.stop(startTime + 0.35);
     });
-  } catch(e) {
-    console.log("Audio tidak didukung atau diblokir", e);
-  }
+  } catch(e) {}
 }
 
-// Warna Pastel Avatar Inisial
-const AVATAR_COLORS = [
-  '#2563eb', '#7c3aed', '#db2777', '#ea580c', 
-  '#059669', '#0891b2', '#4f46e5', '#d97706'
-];
-
+const AVATAR_COLORS = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669', '#0891b2', '#4f46e5', '#d97706'];
 function getAvatarBgColor(name) {
   let hash = 0;
-  for (let i = 0; i < name.length; i++) {
-    hash = name.charCodeAt(i) + ((hash << 5) - hash);
-  }
-  const index = Math.abs(hash) % AVATAR_COLORS.length;
-  return AVATAR_COLORS[index];
+  for (let i = 0; i < name.length; i++) hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length];
 }
 
 /* ---------------- GEOLOCATION ---------------- */
@@ -172,10 +232,7 @@ window.checkLocation = function checkLocation(){
   function finish(){
     if(finished) return;
     finished = true;
-    if(watchId !== null) {
-      navigator.geolocation.clearWatch(watchId);
-      watchId = null;
-    }
+    if(watchId !== null) { navigator.geolocation.clearWatch(watchId); watchId = null; }
     if(best){
       coords = best;
       dot.className='geo-dot ok';
@@ -192,19 +249,12 @@ window.checkLocation = function checkLocation(){
 
   watchId = navigator.geolocation.watchPosition(
     (pos)=>{
-      if(!best || pos.coords.accuracy < best.accuracy){
-        best = pos.coords;
-      }
-      if(pos.coords.accuracy <= 30){
-        finish();
-      }
+      if(!best || pos.coords.accuracy < best.accuracy) best = pos.coords;
+      if(pos.coords.accuracy <= 30) finish();
     },
-    (err)=>{
-      if(!best) finish();
-    },
+    (err)=>{ if(!best) finish(); },
     { enableHighAccuracy:true, timeout:10000, maximumAge:0 }
   );
-
   setTimeout(finish, 6000);
 }
 checkLocation();
@@ -222,6 +272,16 @@ function renderBody(){
       <span class="search-icon">🔍</span>
       <input class="search-input" id="search-input" placeholder="Cari nama anak…" oninput="filterList()">
     </div>
+
+    <!-- Toggle Mode Jemput Lebih Dari 1 Anak -->
+    ${mode === 'jemput' ? `
+      <div class="multi-bar">
+        <label class="multi-bar-label">
+          <input type="checkbox" id="multi-toggle" ${isMultiSelectMode ? 'checked' : ''} onchange="toggleMultiSelect(this.checked)">
+          Jemput lebih dari 1 anak sekaligus
+        </label>
+      </div>
+    ` : ''}
 
     <!-- Filter Bar Kelas P1 - P6 -->
     <div class="class-filter-wrap">
@@ -247,36 +307,42 @@ function renderBody(){
   filterList();
 }
 
+window.toggleMultiSelect = function toggleMultiSelect(checked) {
+  isMultiSelectMode = checked;
+  selectedStudents = [];
+  renderFloatingBar();
+  filterList();
+};
+
 window.setClassFilter = function setClassFilter(cls) {
   selectedClassFilter = cls;
   renderBody();
   window.scrollTo({ top: 0, behavior: 'smooth' });
-}
+};
 
 window.toggleChangePinMode = function toggleChangePinMode(){
   mode = mode === 'jemput' ? 'gantipin' : 'jemput';
+  isMultiSelectMode = false;
+  selectedStudents = [];
+  renderFloatingBar();
   renderBody();
-}
+};
 
 window.filterList = function filterList(){
   const searchInput = document.getElementById('search-input');
   const q = searchInput ? searchInput.value.toLowerCase().trim().replace(/\s+/g, ' ') : '';
   
   let filtered = [...ROSTER];
-
   if (selectedClassFilter !== 'ALL') {
     filtered = filtered.filter(s => String(s.class).toUpperCase().includes(selectedClassFilter));
   }
-
   if (q) {
     filtered = filtered.filter(s => s.name.toLowerCase().includes(q));
   }
-
-  // Urutan Abjad A-Z
   filtered.sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
 
   renderStudentList(filtered);
-}
+};
 
 function renderStudentList(list){
   const el = document.getElementById('student-list');
@@ -304,27 +370,85 @@ function renderStudentList(list){
     const called = mode === 'jemput' && QUEUE.find(q=>q.studentId===s.id);
     const initials = s.name.split(' ').slice(0,2).map(w=>w[0]).join('');
     const avatarBg = getAvatarBgColor(s.name);
-    const handler = mode === 'jemput' ? `openPin('${s.id}')` : `openChangePin('${s.id}')`;
+    const isChecked = selectedStudents.some(item => item.id === s.id);
     
+    let onClickAttr = '';
+    if (!called) {
+      if (mode === 'gantipin') {
+        onClickAttr = `onclick="openChangePin('${s.id}')"`;
+      } else if (isMultiSelectMode) {
+        onClickAttr = `onclick="toggleSelectStudent('${s.id}')"`;
+      } else {
+        onClickAttr = `onclick="openPinSingle('${s.id}')"`;
+      }
+    }
+
     return `
-    <div class="student-row ${called?'disabled':''}" ${called?'':`onclick="${handler}"`}>
+    <div class="student-row ${called?'disabled':''}" ${onClickAttr}>
       <div class="student-left">
+        ${isMultiSelectMode && mode === 'jemput' && !called ? `
+          <input type="checkbox" class="checkbox-custom" ${isChecked ? 'checked' : ''} onclick="event.stopPropagation(); toggleSelectStudent('${s.id}')">
+        ` : ''}
         <div class="avatar" style="background-color: ${avatarBg};">${initials}</div>
         <div>
           <div class="student-name">${s.name}</div>
           <div class="student-class">Kelas ${s.class}</div>
         </div>
       </div>
-      ${called ? `<span class="status-tag">Sudah dipanggil</span>` : `<span class="chevron">${mode==='gantipin' ? '🔑' : '›'}</span>`}
+      ${called ? `<span class="status-tag">Sudah dipanggil</span>` : (
+        isMultiSelectMode && mode === 'jemput' ? '' : `<span class="chevron">${mode==='gantipin' ? '🔑' : '›'}</span>`
+      )}
     </div>`;
   }).join('');
 }
 
-/* ---------------- PIN SHEET ---------------- */
-window.openPin = function openPin(id){
+// Toggle Seleksi Siswa di Multi-Select Mode
+window.toggleSelectStudent = function toggleSelectStudent(id) {
+  const student = ROSTER.find(s => s.id === id);
+  if (!student) return;
+
+  const idx = selectedStudents.findIndex(s => s.id === id);
+  if (idx > -1) {
+    selectedStudents.splice(idx, 1);
+  } else {
+    selectedStudents.push(student);
+  }
+  renderFloatingBar();
+  filterList();
+};
+
+function renderFloatingBar() {
+  const container = document.getElementById('floating-bar-container');
+  if (!isMultiSelectMode || selectedStudents.length === 0) {
+    container.innerHTML = '';
+    return;
+  }
+
+  container.innerHTML = `
+    <div class="floating-action-bar">
+      <div class="floating-action-text">${selectedStudents.length} Siswa Terpilih</div>
+      <button class="floating-action-btn" onclick="openPinMulti()">Lanjut Jemput ›</button>
+    </div>
+  `;
+}
+
+/* ---------------- PIN SHEET MULTI & SINGLE ---------------- */
+window.openPinSingle = function openPinSingle(id){
+  const student = ROSTER.find(s => s.id === id);
+  if(student) {
+    selectedStudents = [student];
+    openPinSheet();
+  }
+};
+
+window.openPinMulti = function openPinMulti(){
+  if(selectedStudents.length === 0) return;
+  openPinSheet();
+};
+
+function openPinSheet(){
   if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
-  selectedStudent = ROSTER.find(s=>s.id===id);
-  pin=''; pickerName='';
+  pin = ''; pickerName = '';
   renderPinSheet();
   document.getElementById('sheet-overlay').classList.add('open');
   setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
@@ -335,16 +459,17 @@ window.closeSheet = function closeSheet(){
   if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
 }
 
-window.updatePickerName = function updatePickerName(v){
-  pickerName = v;
-}
+window.updatePickerName = function updatePickerName(v){ pickerName = v; };
 
 function renderPinSheet(pinErr, nameErr){
   const c = document.getElementById('sheet-content');
   const safeName = pickerName.replace(/"/g,'&quot;');
+  
+  const studentNamesDisplay = selectedStudents.map(s => `<b>${s.name}</b> (Kelas ${s.class})`).join(', ');
+
   c.innerHTML = `
     <div class="sheet-title">Verifikasi Penjemputan</div>
-    <div class="sheet-sub">Untuk menjemput <b>${selectedStudent.name}</b> · Kelas ${selectedStudent.class}</div>
+    <div class="sheet-sub">Menjemput (${selectedStudents.length} siswa): ${studentNamesDisplay}</div>
 
     <div class="field-label" style="margin-top:2px;">Nama penjemput <span style="color:var(--coral);">*wajib diisi</span></div>
     <input class="text-input" id="picker-name" value="${safeName}" oninput="updatePickerName(this.value)" placeholder="cth: Budi (Ojek Online) / Nenek">
@@ -374,12 +499,12 @@ window.pressKey = function pressKey(n){
   pin += n;
   renderPinSheet();
   if(pin.length===4) checkPin();
-}
+};
 
 window.backspace = function backspace(){
   pin = pin.slice(0,-1);
   renderPinSheet();
-}
+};
 
 async function checkPin(){
   if(!pickerName.trim()){
@@ -392,40 +517,44 @@ async function checkPin(){
   const c = document.getElementById('sheet-content');
   c.style.opacity='.5'; c.style.pointerEvents='none';
 
-  let result;
-  try{
-    result = await submitPickup(selectedStudent.id, pin, pickerName.trim(), coords);
-  }catch(e){
-    c.style.opacity='1'; c.style.pointerEvents='auto';
-    pin='';
-    renderPinSheet('Gagal menghubungi server. Periksa koneksi internet Anda.');
-    return;
+  let successQueueIds = [];
+  let lastErrorReason = null;
+
+  // Proses Submit Pickup untuk Setiap Siswa Terpilih
+  for (const s of selectedStudents) {
+    try {
+      const res = await submitPickup(s.id, pin, pickerName.trim(), coords);
+      if (res.ok) {
+        successQueueIds.push(res.queueId);
+      } else {
+        lastErrorReason = res.reason;
+      }
+    } catch(e) {
+      lastErrorReason = 'server_error';
+    }
   }
+
   c.style.opacity='1'; c.style.pointerEvents='auto';
 
-  if(result.ok){
-    showWaitingScreen(result.queueId);
+  if(successQueueIds.length > 0){
+    // Reset seleksi setelah sukses
+    selectedStudents = [];
+    renderFloatingBar();
+    showWaitingScreen(successQueueIds);
     return;
   }
 
   pin='';
   if(dotsEl) dotsEl.classList.add('shake');
 
-  const messages = {
-    wrong_pin: `PIN salah. ${result.attemptsLeft!=null ? `Percobaan tersisa: ${result.attemptsLeft}.` : ''}`,
-    locked: null,
-    out_of_range: null,
-    already_queued: 'Siswa ini sudah masuk antrean penjemputan.',
-  };
-
-  if(result.reason==='locked'){
+  if(lastErrorReason === 'locked'){
     c.innerHTML = `
       <div class="sheet-title">Verifikasi terkunci</div>
-      <div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${selectedStudent.name}.</div>
+      <div class="sheet-sub">Terlalu banyak percobaan PIN salah.</div>
       <div class="lockout-box">🔒 Demi keamanan, akun ini dikunci sementara. Silakan hubungi <b>guru piket di gerbang</b> untuk verifikasi manual.</div>
       <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
     `;
-  } else if(result.reason==='out_of_range'){
+  } else if(lastErrorReason === 'out_of_range'){
     c.innerHTML = `
       <div class="sheet-title">Diluar radius sekolah</div>
       <div class="sheet-sub">Lokasi Anda saat ini terlalu jauh dari gerbang sekolah.</div>
@@ -433,58 +562,21 @@ async function checkPin(){
       <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
     `;
   } else {
-    renderPinSheet(messages[result.reason] || 'Terjadi kesalahan, coba lagi.');
+    renderPinSheet('PIN salah atau terjadi masalah. Silakan coba lagi.');
   }
 }
 
-function showWaitingScreen(queueId){
-  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
+function showWaitingScreen(queueIds){
   const c = document.getElementById('sheet-content');
-  let lastStatus = null;
-
-  unsubWaiting = listenQueueEntry(queueId, (entry)=>{
-    if(!entry){
-      c.innerHTML = `
-        <div class="success-wrap">
-          <div class="success-icon">🎉</div>
-          <div class="success-title">Penjemputan Selesai</div>
-          <div class="success-sub">Terima kasih. <b>${selectedStudent.name}</b> sudah diserahkan kepada penjemput.</div>
-          <button class="sheet-btn" onclick="closeSheet()">Tutup</button>
-        </div>
-      `;
-      if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
-      return;
-    }
-
-    if(entry.status === 'called' && lastStatus !== 'called'){
-      playChime();
-      if(navigator.vibrate){
-        navigator.vibrate([250,120,250,120,250]);
-      }
-    }
-    lastStatus = entry.status;
-
-    if(entry.status === 'called'){
-      c.innerHTML = `
-        <div class="success-wrap called-pop">
-          <div class="success-icon called-icon">🔔</div>
-          <div class="success-title">Anak Anda Sudah Keluar!</div>
-          <div class="success-sub">Silakan sambut <b>${entry.name}</b> di gerbang sekarang.</div>
-          <div class="success-name">Kelas ${entry.class}</div>
-          <button class="sheet-btn" onclick="closeSheet()">Tutup</button>
-        </div>
-      `;
-    } else {
-      c.innerHTML = `
-        <div class="success-wrap">
-          <div class="success-icon waiting-icon">⏳</div>
-          <div class="success-title">Menunggu Dipanggil</div>
-          <div class="success-sub">Anak Anda segera dipanggil oleh guru. Halaman ini otomatis update — silakan tunggu di luar atau di mobil, tanpa perlu menutup halaman ini.</div>
-          <div class="success-name">Menjemput <b>${entry.name}</b><br><span style="font-size:12px;color:var(--slate);">Kelas ${entry.class}</span></div>
-        </div>
-      `;
-    }
-  });
+  
+  c.innerHTML = `
+    <div class="success-wrap">
+      <div class="success-icon waiting-icon">⏳</div>
+      <div class="success-title">Menunggu Dipanggil</div>
+      <div class="success-sub">Permintaan penjemputan untuk <b>${queueIds.length} anak</b> telah berhasil dikirim ke guru piket. Silakan tunggu di gerbang.</div>
+      <button class="sheet-btn" onclick="closeSheet()">Selesai & Tutup</button>
+    </div>
+  `;
 }
 
 /* ---------------- GANTI PIN ---------------- */
@@ -493,7 +585,7 @@ window.openChangePin = function openChangePin(id){
   cpStage = 'current'; cpPin = ''; cpVals = { current:'', new:'', confirm:'' };
   renderChangePinSheet();
   document.getElementById('sheet-overlay').classList.add('open');
-}
+};
 
 const CP_LABELS = {
   current: { title: 'Verifikasi PIN Lama', sub: (n)=>`Masukkan PIN keluarga yang berlaku saat ini untuk ${n}` },
@@ -525,12 +617,12 @@ window.cpPressKey = function cpPressKey(n){
   cpPin += n;
   renderChangePinSheet();
   if(cpPin.length===4) cpAdvance();
-}
+};
 
 window.cpBackspace = function cpBackspace(){
   cpPin = cpPin.slice(0,-1);
   renderChangePinSheet();
-}
+};
 
 async function cpAdvance(){
   if(cpStage === 'current'){
