@@ -86,7 +86,7 @@
 </div>
 
 <script type="module">
-import { listenRoster, listenQueue, submitPickup, changeFamilyPin, listenQueueEntry } from "./firebase-config.js";
+import { getRosterOnce, listenQueue, submitPickup, changeFamilyPin, listenQueueEntry } from "./firebase-config.js";
 
 let ROSTER = [];
 let QUEUE = [];
@@ -195,8 +195,7 @@ function playCallNotifSound(){
   if(notifAudioCtx.state === 'suspended') notifAudioCtx.resume();
   const now = notifAudioCtx.currentTime;
   
-  // Kompleksitas nada ditingkatkan menjadi 3 tahap beruntun dengan frekuensi lebih tinggi (lebih nyaring di luar ruangan)
-  playTone(notifAudioCtx, 1046.50, now, 0.15);       // Nada C6
+  playTone(notifAudioCtx, 1046.50, now, 0.15);        // Nada C6
   playTone(notifAudioCtx, 1318.51, now + 0.18, 0.15); // Nada E6
   playTone(notifAudioCtx, 1567.98, now + 0.36, 0.25); // Nada G6
 }
@@ -260,8 +259,17 @@ window.checkLocation = function checkLocation(){
 }
 checkLocation();
 
-/* ---------------- ROSTER + QUEUE (real-time) ---------------- */
-listenRoster((list)=>{ ROSTER = list; renderBody(); });
+/* ---------------- INITIALIZE DATA (ROSTER SEKALI AMBIL & QUEUE REAL-TIME) ---------------- */
+async function initAppData() {
+  try {
+    ROSTER = await getRosterOnce();
+    renderBody();
+  } catch(e) {
+    console.error("Gagal memuat data roster", e);
+  }
+}
+initAppData();
+
 listenQueue((list)=>{ QUEUE = list; renderBody(); });
 
 function renderBody(){
@@ -341,7 +349,6 @@ window.filterList = function filterList(){
     return matchName && matchClass;
   });
 
-  // Urutkan daftar siswa secara rapi sesuai abjad (A - Z)
   filtered.sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
 
   renderStudentList(filtered);
@@ -606,7 +613,6 @@ function showWaitingScreen() {
     });
 
     if (hasNewCall) {
-      // Pola getar ditingkatkan intensitasnya agar terasa di luar ruangan
       if (navigator.vibrate) navigator.vibrate([400, 100, 400, 150, 400]);
       playCallNotifSound();
     }
