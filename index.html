@@ -170,7 +170,7 @@ window.shareLink = function shareLink() {
   }
 };
 
-/* ---------------- SUARA NOTIFIKASI ---------------- */
+/* ---------------- SUARA NOTIFIKASI & GETAR (DIOPTIMALKAN UNTUK OUTDOOR) ---------------- */
 let notifAudioCtx = null;
 function warmUpAudio(){
   if(!notifAudioCtx){
@@ -194,8 +194,11 @@ function playCallNotifSound(){
   if(!notifAudioCtx) return;
   if(notifAudioCtx.state === 'suspended') notifAudioCtx.resume();
   const now = notifAudioCtx.currentTime;
-  playTone(notifAudioCtx, 880, now, 0.18);
-  playTone(notifAudioCtx, 1175, now + 0.2, 0.24);
+  
+  // Kompleksitas nada ditingkatkan menjadi 3 tahap beruntun dengan frekuensi lebih tinggi (lebih nyaring di luar ruangan)
+  playTone(notifAudioCtx, 1046.50, now, 0.15);       // Nada C6
+  playTone(notifAudioCtx, 1318.51, now + 0.18, 0.15); // Nada E6
+  playTone(notifAudioCtx, 1567.98, now + 0.36, 0.25); // Nada G6
 }
 
 /* ---------------- GEOLOCATION ---------------- */
@@ -600,7 +603,8 @@ function showWaitingScreen() {
     });
 
     if (hasNewCall) {
-      if (navigator.vibrate) navigator.vibrate([250, 120, 250, 120, 250]);
+      // Pola getar ditingkatkan intensitasnya agar terasa di luar ruangan
+      if (navigator.vibrate) navigator.vibrate([400, 100, 400, 150, 400]);
       playCallNotifSound();
     }
 
