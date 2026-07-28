@@ -50,16 +50,16 @@
 
 </div>
 
-<!-- BOTTOM BAR MELAYANG JIKA ANAK DICENTANG -->
+<!-- BOTTOM BAR UNTUK MODE MULTI-CHILD -->
 <div class="pickup-bar" id="pickup-bar" style="display: none;">
   <div class="pickup-bar-info">
-    <span class="pickup-bar-count" id="pickup-bar-count">0 Siswa Dipilih</span>
-    <span class="pickup-bar-sub">Ketuk tombol untuk memproses penjemputan</span>
+    <span class="pickup-bar-count" id="pickup-bar-count">0 Anak Terpilih</span>
+    <span class="pickup-bar-sub">Ketuk untuk memasukkan PIN penjemputan</span>
   </div>
   <button class="pickup-bar-btn" onclick="startMultiPickupProcess()">Lanjut Penjemputan ›</button>
 </div>
 
-<!-- PIN SHEET MODAL -->
+<!-- SHEET PIN / DIALOG -->
 <div class="sheet-overlay" id="sheet-overlay">
   <div class="sheet">
     <div class="sheet-handle"></div>
@@ -74,16 +74,17 @@ let ROSTER = [];
 let QUEUE = [];
 let coords = null;
 
-/* State Penjemputan Multi-Anak */
-let selectedStudentIds = []; // Daftar ID siswa yang dicentang
-let currentMultiIndex = 0;   // Urutan anak yang sedang diisi PIN-nya
-let verifiedPickups = [];    // Menyimpan data anak yang PIN-nya berhasil diproses
+/* Mode Operasi: 'single' | 'multi' | 'gantipin' */
+let mode = 'single'; 
+
+let selectedStudentIds = []; // ID siswa terpilih untuk mode multi
+let currentMultiIndex = 0;   // Urutan penjemputan multi-anak
+let verifiedPickups = [];
 
 let pin = '';
 let pickerName = '';
-let mode = 'jemput'; // 'jemput' | 'gantipin'
 let cpStudent = null;
-let cpStage = 'current'; // 'current' | 'new' | 'confirm'
+let cpStage = 'current';
 let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
 let unsubWaiting = null;
@@ -201,6 +202,25 @@ function renderBody(){
   const classes = ['Semua', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
 
   el.innerHTML = `
+    <!-- TOMBOL PILIH MODE PENJEMPUTAN -->
+    <div class="mode-selection-bar">
+      ${mode === 'single' ? `
+        <button class="multi-toggle-btn" onclick="switchMode('multi')">
+          ➕ Jemput >1 Anak Sekaligus
+        </button>
+      ` : mode === 'multi' ? `
+        <div class="multi-active-banner">
+          <span>☑️ Mode Penjemputan >1 Anak Aktif</span>
+          <button class="btn-cancel-mode" onclick="switchMode('single')">Kembali ke 1 Anak</button>
+        </div>
+      ` : `
+        <div class="multi-active-banner">
+          <span>🔑 Mode Ganti PIN Aktif</span>
+          <button class="btn-cancel-mode" onclick="switchMode('single')">Batal</button>
+        </div>
+      `}
+    </div>
+
     <div class="search-wrap">
       <span class="search-icon">🔍</span>
       <input class="search-input" id="search-input" placeholder="Cari nama anak…" oninput="filterList()">
@@ -215,30 +235,27 @@ function renderBody(){
       `).join('')}
     </div>
 
-    ${mode === 'gantipin' ? `
-      <div class="mode-banner">
-        <span>🔑 Mode Ganti PIN aktif — pilih nama anak untuk mengganti PIN keluarganya</span>
-        <button class="mode-banner-cancel" onclick="toggleChangePinMode()">Batal</button>
-      </div>
-    ` : ''}
     <div class="section-label-row">
-      <div class="section-label">${mode === 'gantipin' ? 'Pilih siswa untuk ganti PIN' : 'Centang nama siswa yang ingin dijemput:'}</div>
-      ${mode === 'jemput' ? `<button class="link-btn" onclick="toggleChangePinMode()">🔑 Lupa / ganti PIN</button>` : ''}
+      <div class="section-label">
+        ${mode === 'multi' ? 'Centang anak-anak yang akan dijemput:' : mode === 'gantipin' ? 'Pilih anak untuk ganti PIN:' : 'Ketuk nama anak yang akan dijemput:'}
+      </div>
+      ${mode === 'single' ? `<button class="link-btn" onclick="switchMode('gantipin')">🔑 Lupa / Ganti PIN</button>` : ''}
     </div>
+    
     <div class="student-list" id="student-list"></div>
   `;
   filterList();
   updatePickupBar();
 }
 
-window.selectClassFilter = function selectClassFilter(c){
-  selectedClassFilter = c;
+window.switchMode = function switchMode(newMode){
+  mode = newMode;
+  selectedStudentIds = [];
   renderBody();
 }
 
-window.toggleChangePinMode = function toggleChangePinMode(){
-  mode = mode === 'jemput' ? 'gantipin' : 'jemput';
-  selectedStudentIds = [];
+window.selectClassFilter = function selectClassFilter(c){
+  selectedClassFilter = c;
   renderBody();
 }
 
@@ -269,9 +286,11 @@ function renderStudentList(list){
     
     let onClickHandler = '';
     if(!called){
-      if(mode === 'jemput'){
+      if(mode === 'single'){
+        onClickHandler = `onclick="startSinglePickup('${s.id}')"`;
+      } else if(mode === 'multi'){
         onClickHandler = `onclick="toggleSelectStudent('${s.id}')"`;
-      } else {
+      } else if(mode === 'gantipin'){
         onClickHandler = `onclick="openChangePin('${s.id}')"`;
       }
     }
@@ -279,7 +298,7 @@ function renderStudentList(list){
     return `
     <div class="student-row ${called ? 'disabled' : ''} ${isSelected ? 'selected' : ''}" ${onClickHandler}>
       <div class="student-left">
-        ${mode === 'jemput' && !called ? `
+        ${mode === 'multi' && !called ? `
           <div class="checkbox ${isSelected ? 'checked' : ''}">
             ${isSelected ? '✓' : ''}
           </div>
@@ -294,7 +313,20 @@ function renderStudentList(list){
   }).join('');
 }
 
-/* ---------------- TOGGLE CHECKBOX SISWA & BAR MELAYANG ---------------- */
+/* ---------------- ALUR PENJEMPUTAN 1 ANAK (SINGLE) ---------------- */
+window.startSinglePickup = function startSinglePickup(studentId){
+  selectedStudentIds = [studentId];
+  currentMultiIndex = 0;
+  verifiedPickups = [];
+  pin = '';
+  pickerName = '';
+
+  renderPinSheet();
+  document.getElementById('sheet-overlay').classList.add('open');
+  setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
+}
+
+/* ---------------- ALUR PENJEMPUTAN >1 ANAK (MULTI) ---------------- */
 window.toggleSelectStudent = function toggleSelectStudent(id){
   const idx = selectedStudentIds.indexOf(id);
   if(idx > -1){
@@ -311,7 +343,7 @@ function updatePickupBar(){
   const countEl = document.getElementById('pickup-bar-count');
   if(!bar) return;
 
-  if(mode === 'jemput' && selectedStudentIds.length > 0){
+  if(mode === 'multi' && selectedStudentIds.length > 0){
     bar.style.display = 'flex';
     countEl.textContent = `${selectedStudentIds.length} Anak Terpilih`;
   } else {
@@ -319,7 +351,6 @@ function updatePickupBar(){
   }
 }
 
-/* ---------------- PROSES PENJEMPUTAN DENGAN MULTI PIN ---------------- */
 window.startMultiPickupProcess = function startMultiPickupProcess(){
   if(selectedStudentIds.length === 0) return;
   if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
@@ -352,7 +383,7 @@ function renderPinSheet(pinErr, nameErr){
 
   c.innerHTML = `
     <div class="sheet-title">Verifikasi PIN Penjemputan</div>
-    <div class="multi-step-badge">Anak ke-${currentMultiIndex + 1} dari ${totalStudents}</div>
+    ${totalStudents > 1 ? `<div class="multi-step-badge">Anak ke-${currentMultiIndex + 1} dari ${totalStudents}</div>` : ''}
     <div class="sheet-sub">Menjemput: <b>${student.name}</b> (Kelas ${student.class})</div>
 
     ${currentMultiIndex === 0 ? `
@@ -428,11 +459,9 @@ async function checkAndAdvanceMultiPickup(){
     currentMultiIndex++;
     pin = '';
 
-    // Jika masih ada anak selanjutnya yang perlu PIN
     if(currentMultiIndex < selectedStudentIds.length){
       renderPinSheet();
     } else {
-      // Semua PIN anak sudah selesai diverifikasi
       selectedStudentIds = [];
       updatePickupBar();
       showWaitingScreen(result.queueId);
@@ -440,7 +469,6 @@ async function checkAndAdvanceMultiPickup(){
     return;
   }
 
-  // Jika PIN salah
   pin='';
   if(dotsEl) dotsEl.classList.add('shake');
 
@@ -483,8 +511,8 @@ function showWaitingScreen(queueId){
         <div class="success-wrap">
           <div class="success-icon">🎉</div>
           <div class="success-title">Penjemputan Selesai</div>
-          <div class="success-sub">Anak-anak yang Anda jemput sudah diserahkan.</div>
-          <button class="sheet-btn" onclick="closeSheet()">Tutup</button>
+          <div class="success-sub">Anak yang Anda jemput telah diserahkan.</div>
+          <button class="sheet-btn" onclick="closeSheet(); switchMode('single');">Selesai</button>
         </div>
       `;
       if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
@@ -503,7 +531,7 @@ function showWaitingScreen(queueId){
           <div class="success-icon called-icon">🔔</div>
           <div class="success-title">Anak Anda Dipanggil!</div>
           <div class="success-sub">Silakan menuju area gerbang untuk penjemputan.</div>
-          <button class="sheet-btn" onclick="closeSheet()">Tutup</button>
+          <button class="sheet-btn" onclick="closeSheet(); switchMode('single');">Tutup</button>
         </div>
       `;
     } else {
@@ -512,7 +540,7 @@ function showWaitingScreen(queueId){
           <div class="success-icon waiting-icon">⏳</div>
           <div class="success-title">Dalam Antrean</div>
           <div class="success-sub">Permintaan penjemputan berhasil. Guru piket akan memanggil nama anak Anda.</div>
-          <button class="sheet-btn ghost" onclick="closeSheet()">Tutup jendela</button>
+          <button class="sheet-btn ghost" onclick="closeSheet(); switchMode('single');">Tutup jendela</button>
         </div>
       `;
     }
@@ -603,7 +631,7 @@ async function cpAdvance(){
         <div class="success-icon">✓</div>
         <div class="success-title">PIN Berhasil Diganti</div>
         <div class="success-sub">PIN untuk ${cpStudent.name} telah berhasil diperbarui.</div>
-        <button class="sheet-btn" onclick="closeSheet(); mode='jemput'; renderBody();">Selesai</button>
+        <button class="sheet-btn" onclick="closeSheet(); switchMode('single');">Selesai</button>
       </div>
     `;
     return;
