@@ -1,7 +1,5 @@
 // ==========================================================================
-// KONFIGURASI FIREBASE — isi 6 baris di bawah ini dengan nilai dari
-// Firebase Console > Project settings > Your apps > Web app > SDK setup.
-// Lihat README.md di folder jemput-backend untuk langkah lengkapnya.
+// KONFIGURASI FIREBASE (TEROPTIMASI UNTUK MENGHEMAT READS)
 // ==========================================================================
 export const firebaseConfig = {
   apiKey: "AIzaSyDVD2HB3Q_Ltp-zSIufgN7Ajq9MG2CvADQ",
@@ -14,7 +12,7 @@ export const firebaseConfig = {
 
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
 import {
-  initializeFirestore, collection, onSnapshot,
+  initializeFirestore, collection, onSnapshot, getDocs,
   doc, deleteDoc, updateDoc, serverTimestamp,
 } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 import {
@@ -27,7 +25,6 @@ import {
 const app = initializeApp(firebaseConfig);
 
 // Memaksa Firestore menggunakan long-polling murni dan mematikan Fetch Streams
-// agar tidak terkena error WebChannel (400/404) akibat pembatasan jaringan/firewall.
 export const db = initializeFirestore(app, {
   experimentalForceLongPolling: true,
   useFetchStreams: false,
@@ -36,11 +33,33 @@ export const db = initializeFirestore(app, {
 export const auth = getAuth(app);
 const functions = getFunctions(app);
 
-/* ---------- roster: dengar daftar siswa secara real-time ---------- */
-export function listenRoster(onChange) {
-  return onSnapshot(collection(db, "students_public"), (snap) => {
-    onChange(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-  });
+/* ---------- ROSTER: Dioptimalkan dengan LocalStorage Cache (Hemat Reads) ---------- */
+export async function listenRoster(onChange) {
+  const CACHE_KEY = 'an_nashir_roster_cache';
+  
+  // 1. Ambil dari cache lokal terlebih dahulu agar UI langsung tampil cepat tanpa reads
+  const cachedData = localStorage.getItem(CACHE_KEY);
+  if (cachedData) {
+    try {
+      onChange(JSON.parse(cachedData));
+    } catch (e) {
+      console.error("Gagal parsing cache roster:", e);
+    }
+  }
+
+  // 2. Ambil data terbaru dari server sekali jalan (GetDocs, bukan onSnapshot)
+  try {
+    const snap = await getDocs(collection(db, "students_public"));
+    const freshList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    
+    // Simpan ke cache lokal untuk kunjungan berikutnya
+    localStorage.setItem(CACHE_KEY, JSON.stringify(freshList));
+    
+    // Kirim data segar ke UI
+    onChange(freshList);
+  } catch (e) {
+    console.error("Gagal mengambil data roster dari server:", e);
+  }
 }
 
 /* ---------- antrean penjemputan: dengar seluruh antrean (untuk Layar Kelas) ---------- */
@@ -74,7 +93,7 @@ export async function submitPickup(studentId, pin, pickerName, coords) {
     studentId, pin, pickerName,
     lat: coords?.latitude, lng: coords?.longitude, accuracy: coords?.accuracy,
   });
-  return res.data; // { ok, reason?, attemptsLeft? }
+  return res.data; 
 }
 
 /* ---------- orang tua: ganti PIN keluarga sendiri (butuh PIN lama) ---------- */
@@ -84,7 +103,7 @@ export async function changeFamilyPin(studentId, currentPin, newPin, coords) {
     studentId, currentPin, newPin,
     lat: coords?.latitude, lng: coords?.longitude, accuracy: coords?.accuracy,
   });
-  return res.data; // { ok, reason?, attemptsLeft? }
+  return res.data; 
 }
 
 /* ---------- admin: login & sesi ---------- */
