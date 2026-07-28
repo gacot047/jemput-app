@@ -96,7 +96,7 @@ let coords = null;
 let mode = 'single'; 
 
 let selectedStudentIds = []; // ID siswa terpilih untuk mode multi
-let currentMultiIndex = 0;   // Urutan penjemputan multi-anak
+let currentMultiIndex = 0;    // Urutan penjemputan multi-anak
 let verifiedPickups = [];
 
 let pin = '';
@@ -364,7 +364,6 @@ function renderStudentList(list){
       }
     }
 
-    /* Berikan warna background acak & teks putih jika belum dipanggil, biarkan default (abu-abu) jika sudah dipanggil */
     const avatarStyle = called ? '' : `style="background-color: ${getAvatarBg(s.name)}; color: #ffffff;"`;
 
     return `
@@ -636,9 +635,11 @@ function showWaitingScreen() {
           `).join('')}
         </div>
 
-        <button class="sheet-btn ${allCalledOrDone ? '' : 'ghost'}" onclick="closeSheet(); switchMode('single');">
-          ${allCalledOrDone ? 'Selesai' : 'Tutup Jendela'}
-        </button>
+        ${allCalledOrDone ? `
+          <button class="sheet-btn" onclick="closeSheet(); switchMode('single');">
+            Selesai
+          </button>
+        ` : ''}
       </div>
     `;
   });
@@ -654,7 +655,7 @@ window.openChangePin = function openChangePin(id){
 
 const CP_LABELS = {
   current: { title: 'Verifikasi PIN Lama', sub: (n)=>`Masukkan PIN lama untuk ${n}` },
-  new:     { title: 'Buat PIN Baru',       sub: ()=>'Masukkan 4 digit PIN baru' },
+  new:     { title: 'Buat PIN Baru',        sub: ()=>'Masukkan 4 digit PIN baru' },
   confirm: { title: 'Konfirmasi PIN Baru', sub: ()=>'Ketik ulang PIN baru untuk konfirmasi' },
 };
 
