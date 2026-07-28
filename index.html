@@ -86,7 +86,7 @@
 </div>
 
 <script type="module">
-import { fetchRosterOnce, listenQueue, submitPickup, changeFamilyPin, listenQueueEntry } from "./firebase-config.js";
+import { listenRoster, listenQueue, submitPickup, changeFamilyPin, listenQueueEntry } from "./firebase-config.js";
 
 let ROSTER = [];
 let QUEUE = [];
@@ -195,26 +195,27 @@ function playCallNotifSound(){
   if(notifAudioCtx.state === 'suspended') notifAudioCtx.resume();
   const now = notifAudioCtx.currentTime;
   
-  playTone(notifAudioCtx, 1046.50, now, 0.15);       
-  playTone(notifAudioCtx, 1318.51, now + 0.18, 0.15); 
-  playTone(notifAudioCtx, 1567.98, now + 0.36, 0.25); 
+  // Kompleksitas nada ditingkatkan menjadi 3 tahap beruntun dengan frekuensi lebih tinggi (lebih nyaring di luar ruangan)
+  playTone(notifAudioCtx, 1046.50, now, 0.15);       // Nada C6
+  playTone(notifAudioCtx, 1318.51, now + 0.18, 0.15); // Nada E6
+  playTone(notifAudioCtx, 1567.98, now + 0.36, 0.25); // Nada G6
 }
 
-/* ---------------- GEOLOCATION (DIPISAH AGAR TIDAK MEMBLOKIR RENDER) ---------------- */
+/* ---------------- GEOLOCATION ---------------- */
 window.checkLocation = function checkLocation(){
   const dot = document.getElementById('geo-dot');
   const label = document.getElementById('geo-label');
   const sub = document.getElementById('geo-sub');
   const retry = document.getElementById('geo-retry');
-  if(retry) retry.style.display='none';
-  if(label) label.textContent = 'Mengecek lokasi…';
-  if(sub) sub.textContent = 'Mohon tunggu sebentar (menyempurnakan akurasi GPS)';
-  if(dot) dot.className='geo-dot';
+  retry.style.display='none';
+  label.textContent = 'Mengecek lokasi…';
+  sub.textContent = 'Mohon tunggu sebentar (menyempurnakan akurasi GPS)';
+  dot.className='geo-dot';
 
   if(!navigator.geolocation){
-    if(dot) dot.className='geo-dot bad';
-    if(label) label.textContent='Perangkat tidak mendukung lokasi';
-    if(sub) sub.textContent='Gunakan browser lain atau hubungi guru piket';
+    dot.className='geo-dot bad';
+    label.textContent='Perangkat tidak mendukung lokasi';
+    sub.textContent='Gunakan browser lain atau hubungi guru piket';
     return;
   }
 
@@ -228,15 +229,16 @@ window.checkLocation = function checkLocation(){
     if(watchId !== null) navigator.geolocation.clearWatch(watchId);
     if(best){
       coords = best;
-      if(dot) dot.className='geo-dot ok';
-      if(label) label.textContent='Lokasi terdeteksi';
-      if(sub) sub.textContent = `Akurasi ±${Math.round(best.accuracy)}m — jarak diverifikasi saat penjemputan`;
+      dot.className='geo-dot ok';
+      label.textContent='Lokasi terdeteksi';
+      sub.textContent = `Akurasi ±${Math.round(best.accuracy)}m — jarak diverifikasi saat penjemputan`;
     } else {
-      if(dot) dot.className='geo-dot bad';
-      if(label) label.textContent='Lokasi belum ditemukan';
-      if(sub) sub.textContent='Aktifkan izin lokasi lalu coba lagi';
-      if(retry) retry.style.display='inline-block';
+      dot.className='geo-dot bad';
+      label.textContent='Lokasi belum ditemukan';
+      sub.textContent='Aktifkan izin lokasi lalu coba lagi';
+      retry.style.display='inline-block';
     }
+    renderBody();
   }
 
   watchId = navigator.geolocation.watchPosition(
@@ -256,35 +258,10 @@ window.checkLocation = function checkLocation(){
 
   setTimeout(finish, 6000);
 }
-
-// Jalankan pengecekan lokasi di latar belakang secara independen
 checkLocation();
 
-/* ---------------- OPTIMASI READS: ROSTER (FETCH SEKALI + CACHE) & QUEUE (REAL-TIME) ---------------- */
-async function loadRosterData() {
-  const cachedRoster = localStorage.getItem('cache_roster_data');
-  const cacheTimestamp = localStorage.getItem('cache_roster_time');
-  const now = new Date().getTime();
-
-  // Cache berlaku selama 1 hari (24 jam) agar menghemat reads Firestore secara signifikan
-  if (cachedRoster && cacheTimestamp && (now - cacheTimestamp < 24 * 60 * 60 * 1000)) {
-    ROSTER = JSON.parse(cachedRoster);
-    renderBody();
-  } else {
-    try {
-      ROSTER = await fetchRosterOnce();
-      localStorage.setItem('cache_roster_data', JSON.stringify(ROSTER));
-      localStorage.setItem('cache_roster_time', now);
-    } catch (e) {
-      if (cachedRoster) {
-        ROSTER = JSON.parse(cachedRoster); // Fallback ke cache lama jika offline
-      }
-    }
-    renderBody();
-  }
-}
-
-loadRosterData();
+/* ---------------- ROSTER + QUEUE (real-time) ---------------- */
+listenRoster((list)=>{ ROSTER = list; renderBody(); });
 listenQueue((list)=>{ QUEUE = list; renderBody(); });
 
 function renderBody(){
@@ -364,6 +341,7 @@ window.filterList = function filterList(){
     return matchName && matchClass;
   });
 
+  // Urutkan daftar siswa secara rapi sesuai abjad (A - Z)
   filtered.sort((a, b) => a.name.localeCompare(b.name, 'id', { sensitivity: 'base' }));
 
   renderStudentList(filtered);
@@ -478,7 +456,7 @@ function renderPinSheet(pinErr, nameErr){
   c.innerHTML = `
     <div class="sheet-title">Verifikasi PIN Penjemputan</div>
     ${totalStudents > 1 ? `<div class="multi-step-badge">Anak ke-${currentMultiIndex + 1} dari ${totalStudents}</div>` : ''}
-    <div class="sheet-sub">Menjemput: <b>${student ? student.name : 'Siswa'}</b> ${student ? `(Kelas ${student.class})` : ''}</div>
+    <div class="sheet-sub">Menjemput: <b>${student.name}</b> (Kelas ${student.class})</div>
 
     ${currentMultiIndex === 0 ? `
       <div class="field-label" style="margin-top:8px;">Nama Penjemput <span style="color:var(--coral);">*wajib diisi</span></div>
@@ -491,7 +469,7 @@ function renderPinSheet(pinErr, nameErr){
     `}
 
     <div class="field-label" style="margin-top:12px; text-align:center;">
-      Masukkan PIN milik <b>${student ? student.name : 'Siswa'}</b>
+      Masukkan PIN milik <b>${student.name}</b>
     </div>
     <div class="pin-dots" id="pin-dots">
       ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<pin.length?'filled':''}"></div>`).join('')}
@@ -578,7 +556,7 @@ async function checkAndAdvanceMultiPickup(){
   if(result.reason==='locked'){
     c.innerHTML = `
       <div class="sheet-title">Verifikasi terkunci</div>
-      <div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${student ? student.name : 'Siswa'}.</div>
+      <div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${student.name}.</div>
       <div class="lockout-box">🔒 Akses terkunci sementara. Silakan hubungi <b>guru piket</b> untuk verifikasi.</div>
       <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
     `;
@@ -628,6 +606,7 @@ function showWaitingScreen() {
     });
 
     if (hasNewCall) {
+      // Pola getar ditingkatkan intensitasnya agar terasa di luar ruangan
       if (navigator.vibrate) navigator.vibrate([400, 100, 400, 150, 400]);
       playCallNotifSound();
     }
@@ -692,7 +671,7 @@ function renderChangePinSheet(err){
   const { title, sub } = CP_LABELS[cpStage];
   c.innerHTML = `
     <div class="sheet-title">${title}</div>
-    <div class="sheet-sub">${sub(cpStudent ? cpStudent.name : 'Siswa')} ${cpStudent ? `(Kelas ${cpStudent.class})` : ''}</div>
+    <div class="sheet-sub">${sub(cpStudent.name)} (Kelas ${cpStudent.class})</div>
     <div class="pin-dots" id="pin-dots">
       ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<cpPin.length?'filled':''}"></div>`).join('')}
     </div>
@@ -756,7 +735,7 @@ async function cpAdvance(){
       <div class="success-wrap">
         <div class="success-icon">✓</div>
         <div class="success-title">PIN Berhasil Diganti</div>
-        <div class="success-sub">PIN untuk ${cpStudent ? cpStudent.name : 'Siswa'} telah berhasil diperbarui.</div>
+        <div class="success-sub">PIN untuk ${cpStudent.name} telah berhasil diperbarui.</div>
         <button class="sheet-btn" onclick="closeSheet(); switchMode('single');">Selesai</button>
       </div>
     `;
