@@ -21,7 +21,6 @@
 <link rel="stylesheet" href="style.css">
 
 <style>
-  /* Tambahan Style Khusus Multi-Select & Floating Bar */
   .multi-bar {
     display: flex;
     align-items: center;
@@ -41,20 +40,13 @@
     gap: 8px;
     cursor: pointer;
   }
-  .multi-bar-label input[type="checkbox"] {
+  .multi-bar-label input[type="checkbox"], .checkbox-custom {
     width: 18px;
     height: 18px;
     accent-color: #0F1C2E;
     cursor: pointer;
   }
-  .checkbox-custom {
-    width: 22px;
-    height: 22px;
-    accent-color: #0F1C2E;
-    cursor: pointer;
-  }
   
-  /* Floating Bottom Bar saat memilih banyak siswa */
   .floating-action-bar {
     position: fixed;
     bottom: 20px;
@@ -89,6 +81,17 @@
   }
   .floating-action-btn:active {
     transform: scale(0.96);
+  }
+
+  .step-indicator {
+    background: #e2e8f0;
+    color: #334155;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-block;
+    margin-bottom: 6px;
   }
 
   @keyframes slideUp {
@@ -144,22 +147,23 @@
 </div>
 
 <script type="module">
-import { listenRoster, listenQueue, submitPickup, changeFamilyPin, listenQueueEntry } from "./firebase-config.js";
+import { listenRoster, listenQueue, submitPickup, changeFamilyPin } from "./firebase-config.js";
 
 let ROSTER = [];
 let QUEUE = [];
 let coords = null;
-let selectedStudents = []; // Array menampung siswa yang dipilih
+let selectedStudents = []; 
+let currentStudentIndex = 0; // Index antrean verifikasi PIN bertahap
+let successfulPickups = [];  // Menyimpan data siswa yang PIN-nya berhasil divalidasi
 let pin = '';
 let pickerName = '';
-let mode = 'jemput'; // 'jemput' | 'gantipin'
-let isMultiSelectMode = false; // Flag mode seleksi banyak
+let mode = 'jemput'; 
+let isMultiSelectMode = false; 
 let selectedClassFilter = 'ALL'; 
 let cpStudent = null;
 let cpStage = 'current';
 let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
-let unsubWaiting = null;
 
 // Share Link
 window.sharePickupLink = async function sharePickupLink() {
@@ -178,27 +182,6 @@ window.sharePickupLink = async function sharePickupLink() {
     } catch (err) {}
   }
 };
-
-// Suara Chime
-function playChime() {
-  try {
-    const ctx = new (window.AudioContext || window.webkitAudioContext)();
-    const notes = [698.46, 880.00, 1046.50];
-    notes.forEach((freq, index) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const startTime = ctx.currentTime + (index * 0.12);
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(freq, startTime);
-      gain.gain.setValueAtTime(0.6, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.00001, startTime + 0.35);
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.start(startTime);
-      osc.stop(startTime + 0.35);
-    });
-  } catch(e) {}
-}
 
 const AVATAR_COLORS = ['#2563eb', '#7c3aed', '#db2777', '#ea580c', '#059669', '#0891b2', '#4f46e5', '#d97706'];
 function getAvatarBgColor(name) {
@@ -402,7 +385,7 @@ function renderStudentList(list){
   }).join('');
 }
 
-// Toggle Seleksi Siswa di Multi-Select Mode
+// Toggle Seleksi Siswa Multi-Select
 window.toggleSelectStudent = function toggleSelectStudent(id) {
   const student = ROSTER.find(s => s.id === id);
   if (!student) return;
@@ -432,23 +415,25 @@ function renderFloatingBar() {
   `;
 }
 
-/* ---------------- PIN SHEET MULTI & SINGLE ---------------- */
+/* ---------------- VERIFIKASI PIN SEQUENTIAL (OPSI A) ---------------- */
 window.openPinSingle = function openPinSingle(id){
   const student = ROSTER.find(s => s.id === id);
   if(student) {
     selectedStudents = [student];
-    openPinSheet();
+    startPickupFlow();
   }
 };
 
 window.openPinMulti = function openPinMulti(){
   if(selectedStudents.length === 0) return;
-  openPinSheet();
+  startPickupFlow();
 };
 
-function openPinSheet(){
-  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
-  pin = ''; pickerName = '';
+function startPickupFlow(){
+  currentStudentIndex = 0;
+  successfulPickups = [];
+  pin = ''; 
+  pickerName = '';
   renderPinSheet();
   document.getElementById('sheet-overlay').classList.add('open');
   setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
@@ -456,7 +441,6 @@ function openPinSheet(){
 
 window.closeSheet = function closeSheet(){
   document.getElementById('sheet-overlay').classList.remove('open');
-  if(unsubWaiting){ unsubWaiting(); unsubWaiting = null; }
 }
 
 window.updatePickerName = function updatePickerName(v){ pickerName = v; };
@@ -465,17 +449,24 @@ function renderPinSheet(pinErr, nameErr){
   const c = document.getElementById('sheet-content');
   const safeName = pickerName.replace(/"/g,'&quot;');
   
-  const studentNamesDisplay = selectedStudents.map(s => `<b>${s.name}</b> (Kelas ${s.class})`).join(', ');
+  const currentStudent = selectedStudents[currentStudentIndex];
+  const isMulti = selectedStudents.length > 1;
 
   c.innerHTML = `
     <div class="sheet-title">Verifikasi Penjemputan</div>
-    <div class="sheet-sub">Menjemput (${selectedStudents.length} siswa): ${studentNamesDisplay}</div>
+    
+    ${isMulti ? `<div class="step-indicator">Siswa ${currentStudentIndex + 1} dari ${selectedStudents.length}</div>` : ''}
+    
+    <div class="sheet-sub">
+      Masukkan PIN untuk: <br><strong style="font-size:16px; color:#0F1C2E;">${currentStudent.name}</strong> (Kelas ${currentStudent.class})
+    </div>
 
-    <div class="field-label" style="margin-top:2px;">Nama penjemput <span style="color:var(--coral);">*wajib diisi</span></div>
-    <input class="text-input" id="picker-name" value="${safeName}" oninput="updatePickerName(this.value)" placeholder="cth: Budi (Ojek Online) / Nenek">
+    <!-- Nama penjemput diisi 1x di awal -->
+    <div class="field-label" style="margin-top:8px;">Nama penjemput <span style="color:var(--coral);">*wajib diisi</span></div>
+    <input class="text-input" id="picker-name" value="${safeName}" ${currentStudentIndex > 0 ? 'readonly style="background:#f1f5f9;"' : ''} oninput="updatePickerName(this.value)" placeholder="cth: Budi (Ojek Online) / Nenek">
     <div class="pin-error">${nameErr||''}</div>
 
-    <div class="field-label" style="margin-top:10px; text-align:center;">Masukkan PIN Penjemputan</div>
+    <div class="field-label" style="margin-top:10px; text-align:center;">PIN (${currentStudent.name})</div>
     <div class="pin-dots" id="pin-dots">
       ${[0,1,2,3].map(i=>`<div class="pin-dot ${i<pin.length?'filled':''}"></div>`).join('')}
     </div>
@@ -513,48 +504,62 @@ async function checkPin(){
     document.getElementById('picker-name')?.focus();
     return;
   }
+  
   const dotsEl = document.getElementById('pin-dots');
   const c = document.getElementById('sheet-content');
   c.style.opacity='.5'; c.style.pointerEvents='none';
 
-  let successQueueIds = [];
-  let lastErrorReason = null;
+  const currentStudent = selectedStudents[currentStudentIndex];
+  let res;
 
-  // Proses Submit Pickup untuk Setiap Siswa Terpilih
-  for (const s of selectedStudents) {
-    try {
-      const res = await submitPickup(s.id, pin, pickerName.trim(), coords);
-      if (res.ok) {
-        successQueueIds.push(res.queueId);
-      } else {
-        lastErrorReason = res.reason;
-      }
-    } catch(e) {
-      lastErrorReason = 'server_error';
-    }
+  try {
+    res = await submitPickup(currentStudent.id, pin, pickerName.trim(), coords);
+  } catch(e) {
+    c.style.opacity='1'; c.style.pointerEvents='auto';
+    pin='';
+    renderPinSheet('Gagal menghubungi server.');
+    return;
   }
 
   c.style.opacity='1'; c.style.pointerEvents='auto';
 
-  if(successQueueIds.length > 0){
-    // Reset seleksi setelah sukses
-    selectedStudents = [];
-    renderFloatingBar();
-    showWaitingScreen(successQueueIds);
+  if(res.ok) {
+    successfulPickups.push({ student: currentStudent, queueId: res.queueId });
+    
+    currentStudentIndex++;
+    
+    if(currentStudentIndex < selectedStudents.length) {
+      // Masih ada siswa lain, minta PIN siswa berikutnya secara sequential
+      pin = '';
+      renderPinSheet();
+    } else {
+      // Semua siswa berhasil diproses
+      selectedStudents = [];
+      renderFloatingBar();
+      showWaitingScreen();
+    }
     return;
   }
 
+  // Penanganan kegagalan PIN
   pin='';
   if(dotsEl) dotsEl.classList.add('shake');
 
-  if(lastErrorReason === 'locked'){
+  const messages = {
+    wrong_pin: `PIN salah untuk ${currentStudent.name}. ${res.attemptsLeft!=null ? `Sisa percobaan: ${res.attemptsLeft}.` : ''}`,
+    locked: null,
+    out_of_range: null,
+    already_queued: `${currentStudent.name} sudah ada di antrean penjemputan.`,
+  };
+
+  if(res.reason === 'locked'){
     c.innerHTML = `
       <div class="sheet-title">Verifikasi terkunci</div>
-      <div class="sheet-sub">Terlalu banyak percobaan PIN salah.</div>
-      <div class="lockout-box">🔒 Demi keamanan, akun ini dikunci sementara. Silakan hubungi <b>guru piket di gerbang</b> untuk verifikasi manual.</div>
+      <div class="sheet-sub">Terlalu banyak percobaan PIN salah untuk ${currentStudent.name}.</div>
+      <div class="lockout-box">🔒 Akses terkunci sementara. Hubungi guru piket di gerbang.</div>
       <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
     `;
-  } else if(lastErrorReason === 'out_of_range'){
+  } else if(res.reason === 'out_of_range'){
     c.innerHTML = `
       <div class="sheet-title">Diluar radius sekolah</div>
       <div class="sheet-sub">Lokasi Anda saat ini terlalu jauh dari gerbang sekolah.</div>
@@ -562,24 +567,29 @@ async function checkPin(){
       <button class="sheet-btn ghost" onclick="closeSheet()">Tutup</button>
     `;
   } else {
-    renderPinSheet('PIN salah atau terjadi masalah. Silakan coba lagi.');
+    renderPinSheet(messages[res.reason] || 'Gagal memproses penjemputan.');
   }
 }
 
-function showWaitingScreen(queueIds){
+function showWaitingScreen(){
   const c = document.getElementById('sheet-content');
-  
+  const names = successfulPickups.map(p => `• <b>${p.student.name}</b> (Kelas ${p.student.class})`).join('<br>');
+
   c.innerHTML = `
     <div class="success-wrap">
       <div class="success-icon waiting-icon">⏳</div>
-      <div class="success-title">Menunggu Dipanggil</div>
-      <div class="success-sub">Permintaan penjemputan untuk <b>${queueIds.length} anak</b> telah berhasil dikirim ke guru piket. Silakan tunggu di gerbang.</div>
-      <button class="sheet-btn" onclick="closeSheet()">Selesai & Tutup</button>
+      <div class="success-title">Berhasil Masuk Antrean</div>
+      <div class="success-sub">Permintaan penjemputan berhasil dikirim untuk:</div>
+      <div style="margin:12px 0; text-align:left; background:#f8fafc; padding:12px; border-radius:10px; font-size:14px; line-height:1.6; color:#1e293b;">
+        ${names}
+      </div>
+      <div class="success-sub">Silakan menunggu anak-anak dipanggil oleh guru piket di gerbang.</div>
+      <button class="sheet-btn" style="margin-top:14px;" onclick="closeSheet()">Selesai & Tutup</button>
     </div>
   `;
 }
 
-/* ---------------- GANTI PIN ---------------- */
+/* ---------------- FITUR GANTI PIN ---------------- */
 window.openChangePin = function openChangePin(id){
   cpStudent = ROSTER.find(s=>s.id===id);
   cpStage = 'current'; cpPin = ''; cpVals = { current:'', new:'', confirm:'' };
