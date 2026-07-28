@@ -9,6 +9,24 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=2.0">
+
+<style>
+  /* Penyesuaian tombol filter kelas agar muat 1 layar tanpa scroll */
+  .class-filter-wrap {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    gap: 4px !important;
+    overflow-x: visible !important;
+    width: 100% !important;
+  }
+  .class-filter-btn {
+    flex: 1 1 0px !important;
+    padding: 6px 2px !important;
+    font-size: 11px !important;
+    min-width: 0 !important;
+    text-align: center !important;
+  }
+</style>
 </head>
 <body>
 
@@ -90,6 +108,22 @@ let cpVals = { current: '', new: '', confirm: '' };
 let unsubWaiting = null;
 let selectedClassFilter = 'Semua';
 let searchQuery = ''; // Menyimpan state kata kunci pencarian
+
+/* PALET WARNA RANDOM UNTUK AVATAR INISIAL */
+const AVATAR_COLORS = [
+  '#4F46E5', '#7C3AED', '#EC4899', '#F59E0B', '#10B981', 
+  '#3B82F6', '#06B6D4', '#8B5CF6', '#D97706', '#059669',
+  '#E11D48', '#0284C7', '#7E22CE', '#B45309', '#0D9488'
+];
+
+function getAvatarBg(name) {
+  let hash = 0;
+  for (let i = 0; i < name.length; i++) {
+    hash = name.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  const index = Math.abs(hash) % AVATAR_COLORS.length;
+  return AVATAR_COLORS[index];
+}
 
 /* ---------------- NAVIGASI TOMBOL BACK HP / BROWSER ---------------- */
 function openSheetModal() {
@@ -289,18 +323,15 @@ window.selectClassFilter = function selectClassFilter(c){
   renderBody();
 }
 
-/* ---------------- LOGIKA PENCARIAN FLEKSIBEL (NAMA DEPAN/TENGAH/BELAKANG) ---------------- */
+/* ---------------- LOGIKA PENCARIAN FLEKSIBEL ---------------- */
 window.filterList = function filterList(){
   const searchInput = document.getElementById('search-input');
   searchQuery = searchInput ? searchInput.value : '';
   
-  // Pecah kata kunci pencarian menjadi bagian-bagian kata (misal: "budi pratama" -> ["budi", "pratama"])
   const searchTerms = searchQuery.toLowerCase().trim().split(/\s+/).filter(t => t.length > 0);
   
   const filtered = ROSTER.filter(s => {
     const studentName = s.name.toLowerCase();
-    
-    // Semua kata yang diketik harus ditemukan di dalam nama siswa (di posisi mana saja)
     const matchName = searchTerms.every(term => studentName.includes(term));
     const matchClass = selectedClassFilter === 'Semua' || String(s.class).trim().toUpperCase() === selectedClassFilter.toUpperCase();
     
@@ -333,6 +364,9 @@ function renderStudentList(list){
       }
     }
 
+    /* Berikan warna background acak & teks putih jika belum dipanggil, biarkan default (abu-abu) jika sudah dipanggil */
+    const avatarStyle = called ? '' : `style="background-color: ${getAvatarBg(s.name)}; color: #ffffff;"`;
+
     return `
     <div class="student-row ${called ? 'disabled' : ''} ${isSelected ? 'selected' : ''}" ${onClickHandler}>
       <div class="student-left">
@@ -340,7 +374,7 @@ function renderStudentList(list){
           <div class="checkbox ${isSelected ? 'checked' : ''}">
             ${isSelected ? '✓' : ''}
           </div>
-        ` : `<div class="avatar">${initials}</div>`}
+        ` : `<div class="avatar" ${avatarStyle}>${initials}</div>`}
         <div>
           <div class="student-name">${s.name}</div>
           <div class="student-class">Kelas ${s.class}</div>
