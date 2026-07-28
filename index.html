@@ -94,6 +94,17 @@
     margin-bottom: 6px;
   }
 
+  .status-badge-mini {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 6px;
+    border-radius: 4px;
+    display: inline-block;
+    margin-left: 6px;
+  }
+  .status-badge-mini.waiting { background: #fef3c7; color: #b45309; }
+  .status-badge-mini.done { background: #dcfce7; color: #15803d; }
+
   @keyframes slideUp {
     from { transform: translate(-50%, 100%); opacity: 0; }
     to { transform: translate(-50%, 0); opacity: 1; }
@@ -244,7 +255,14 @@ checkLocation();
 
 /* ---------------- ROSTER + QUEUE ---------------- */
 listenRoster((list)=>{ ROSTER = list; renderBody(); });
-listenQueue((list)=>{ QUEUE = list; renderBody(); });
+listenQueue((list)=>{ 
+  QUEUE = list; 
+  renderBody(); 
+  // Update tampilan modal penjemputan secara realtime jika sedang terbuka
+  if (successfulPickups.length > 0 && document.getElementById('sheet-overlay').classList.contains('open')) {
+    updateWaitingScreenStatus();
+  }
+});
 
 function renderBody(){
   const el = document.getElementById('body-content');
@@ -415,7 +433,7 @@ function renderFloatingBar() {
   `;
 }
 
-/* ---------------- VERIFIKASI PIN SEQUENTIAL (OPSI A) ---------------- */
+/* ---------------- VERIFIKASI PIN SEQUENTIAL ---------------- */
 window.openPinSingle = function openPinSingle(id){
   const student = ROSTER.find(s => s.id === id);
   if(student) {
@@ -573,20 +591,68 @@ async function checkPin(){
 
 function showWaitingScreen(){
   const c = document.getElementById('sheet-content');
-  const names = successfulPickups.map(p => `• <b>${p.student.name}</b> (Kelas ${p.student.class})`).join('<br>');
-
   c.innerHTML = `
     <div class="success-wrap">
-      <div class="success-icon waiting-icon">⏳</div>
-      <div class="success-title">Berhasil Masuk Antrean</div>
+      <div class="success-icon waiting-icon" id="modal-status-icon">⏳</div>
+      <div class="success-title" id="modal-status-title">Berhasil Masuk Antrean</div>
       <div class="success-sub">Permintaan penjemputan berhasil dikirim untuk:</div>
-      <div style="margin:12px 0; text-align:left; background:#f8fafc; padding:12px; border-radius:10px; font-size:14px; line-height:1.6; color:#1e293b;">
-        ${names}
+      <div id="modal-student-list" style="margin:12px 0; text-align:left; background:#f8fafc; padding:12px; border-radius:10px; font-size:14px; line-height:1.8; color:#1e293b;">
       </div>
-      <div class="success-sub">Silakan menunggu anak-anak dipanggil oleh guru piket di gerbang.</div>
-      <button class="sheet-btn" style="margin-top:14px;" onclick="closeSheet()">Selesai & Tutup</button>
+      <div class="success-sub" id="modal-status-sub">Silakan menunggu anak-anak dipanggil oleh guru piket di gerbang.</div>
+      
+      <!-- Tombol ini disembunyikan sampai monitor memanggil SEMUA anak -->
+      <button class="sheet-btn" id="done-close-btn" style="margin-top:14px; display:none;" onclick="closeSheet()">Selesai & Tutup</button>
     </div>
   `;
+  updateWaitingScreenStatus();
+}
+
+function updateWaitingScreenStatus(){
+  const listEl = document.getElementById('modal-student-list');
+  const doneBtn = document.getElementById('done-close-btn');
+  const iconEl = document.getElementById('modal-status-icon');
+  const titleEl = document.getElementById('modal-status-title');
+  const subEl = document.getElementById('modal-status-sub');
+  
+  if (!listEl) return;
+
+  let allCalled = true;
+
+  const namesHtml = successfulPickups.map(p => {
+    // Cek apakah siswa masih berada di QUEUE (antrean aktif)
+    const inQueue = QUEUE.find(q => q.studentId === p.student.id || q.id === p.queueId);
+    
+    // Jika tidak ada di QUEUE, atau status di QUEUE bernilai 'called'/'done', berarti sudah dipanggil
+    const isCalled = !inQueue || (inQueue && (inQueue.status === 'called' || inQueue.status === 'done'));
+
+    if (!isCalled) {
+      allCalled = false; // Masih ada minimal 1 anak yang belum dipanggil
+    }
+
+    return `
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:4px;">
+        <span>• <b>${p.student.name}</b> (Kelas ${p.student.class})</span>
+        ${isCalled 
+          ? `<span class="status-badge-mini done">✓ Dipanggil</span>` 
+          : `<span class="status-badge-mini waiting">⏳ Antrean</span>`}
+      </div>
+    `;
+  }).join('');
+
+  listEl.innerHTML = namesHtml;
+
+  // Kontrol tampilan tombol & status berdasarkan sinyal dari monitor
+  if (allCalled) {
+    if (doneBtn) doneBtn.style.display = 'block'; // Tampilkan tombol
+    if (iconEl) iconEl.textContent = '✓';
+    if (titleEl) titleEl.textContent = 'Siswa Siap DiJemput';
+    if (subEl) subEl.textContent = 'Anak-anak sudah dipanggil oleh guru piket. Silakan ambil siswa di gerbang.';
+  } else {
+    if (doneBtn) doneBtn.style.display = 'none'; // Sembunyikan tombol
+    if (iconEl) iconEl.textContent = '⏳';
+    if (titleEl) titleEl.textContent = 'Berhasil Masuk Antrean';
+    if (subEl) subEl.textContent = 'Silakan menunggu anak-anak dipanggil oleh guru piket di gerbang.';
+  }
 }
 
 /* ---------------- FITUR GANTI PIN ---------------- */
@@ -599,7 +665,7 @@ window.openChangePin = function openChangePin(id){
 
 const CP_LABELS = {
   current: { title: 'Verifikasi PIN Lama', sub: (n)=>`Masukkan PIN keluarga yang berlaku saat ini untuk ${n}` },
-  new:     { title: 'Buat PIN Baru',       sub: ()=>'Masukkan PIN baru (4 digit)' },
+  new:      { title: 'Buat PIN Baru',       sub: ()=>'Masukkan PIN baru (4 digit)' },
   confirm: { title: 'Konfirmasi PIN Baru', sub: ()=>'Ulangi sekali lagi PIN baru untuk konfirmasi' },
 };
 
