@@ -26,6 +26,30 @@
     min-width: 0 !important;
     text-align: center !important;
   }
+  
+  /* Indikator loading tambahan yang lebih interaktif */
+  .loading-container {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+    text-align: center;
+    color: var(--text-muted, #64748B);
+  }
+  .loading-spinner {
+    width: 36px;
+    height: 36px;
+    border: 3px solid #E2E8F0;
+    border-top: 3px solid #4F46E5;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 12px;
+  }
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
 </style>
 </head>
 <body>
@@ -63,7 +87,10 @@
   </button>
 
   <div id="body-content">
-    <div class="empty-state">Memuat…</div>
+    <div class="loading-container">
+      <div class="loading-spinner"></div>
+      <div>Memuat data siswa dari server…</div>
+    </div>
   </div>
 
 </div>
@@ -92,11 +119,9 @@ let ROSTER = [];
 let QUEUE = [];
 let coords = null;
 
-/* Mode Operasi: 'single' | 'multi' | 'gantipin' */
 let mode = 'single'; 
-
-let selectedStudentIds = []; // ID siswa terpilih untuk mode multi
-let currentMultiIndex = 0;    // Urutan penjemputan multi-anak
+let selectedStudentIds = [];
+let currentMultiIndex = 0;
 let verifiedPickups = [];
 
 let pin = '';
@@ -107,9 +132,8 @@ let cpPin = '';
 let cpVals = { current: '', new: '', confirm: '' };
 let unsubWaiting = null;
 let selectedClassFilter = 'Semua';
-let searchQuery = ''; // Menyimpan state kata kunci pencarian
+let searchQuery = '';
 
-/* PALET WARNA RANDOM UNTUK AVATAR INISIAL */
 const AVATAR_COLORS = [
   '#4F46E5', '#7C3AED', '#EC4899', '#F59E0B', '#10B981', 
   '#3B82F6', '#06B6D4', '#8B5CF6', '#D97706', '#059669',
@@ -125,7 +149,6 @@ function getAvatarBg(name) {
   return AVATAR_COLORS[index];
 }
 
-/* ---------------- NAVIGASI TOMBOL BACK HP / BROWSER ---------------- */
 function openSheetModal() {
   const overlay = document.getElementById('sheet-overlay');
   if (!overlay.classList.contains('open')) {
@@ -154,7 +177,6 @@ window.addEventListener('popstate', function (event) {
   }
 });
 
-/* ---------------- FUNGSI BAGIKAN LINK ---------------- */
 window.shareLink = function shareLink() {
   const shareData = {
     title: 'Jemput — An Nashir Islamic School',
@@ -170,7 +192,6 @@ window.shareLink = function shareLink() {
   }
 };
 
-/* ---------------- SUARA NOTIFIKASI & GETAR (DIOPTIMALKAN UNTUK OUTDOOR) ---------------- */
 let notifAudioCtx = null;
 function warmUpAudio(){
   if(!notifAudioCtx){
@@ -194,13 +215,11 @@ function playCallNotifSound(){
   if(!notifAudioCtx) return;
   if(notifAudioCtx.state === 'suspended') notifAudioCtx.resume();
   const now = notifAudioCtx.currentTime;
-  
-  playTone(notifAudioCtx, 1046.50, now, 0.15);        // Nada C6
-  playTone(notifAudioCtx, 1318.51, now + 0.18, 0.15); // Nada E6
-  playTone(notifAudioCtx, 1567.98, now + 0.36, 0.25); // Nada G6
+  playTone(notifAudioCtx, 1046.50, now, 0.15);
+  playTone(notifAudioCtx, 1318.51, now + 0.18, 0.15);
+  playTone(notifAudioCtx, 1567.98, now + 0.36, 0.25);
 }
 
-/* ---------------- GEOLOCATION ---------------- */
 window.checkLocation = function checkLocation(){
   const dot = document.getElementById('geo-dot');
   const label = document.getElementById('geo-label');
@@ -259,13 +278,16 @@ window.checkLocation = function checkLocation(){
 }
 checkLocation();
 
-/* ---------------- INITIALIZE DATA (ROSTER SEKALI AMBIL & QUEUE REAL-TIME) ---------------- */
 async function initAppData() {
   try {
     ROSTER = await getRosterOnce();
     renderBody();
   } catch(e) {
     console.error("Gagal memuat data roster", e);
+    const el = document.getElementById('body-content');
+    if(el) {
+      el.innerHTML = `<div class="empty-state" style="color:var(--coral, #E11D48);">Gagal memuat data siswa. Periksa koneksi internet Anda atau refresh halaman.</div>`;
+    }
   }
 }
 initAppData();
@@ -274,10 +296,21 @@ listenQueue((list)=>{ QUEUE = list; renderBody(); });
 
 function renderBody(){
   const el = document.getElementById('body-content');
+  if(!el) return;
+
+  if(ROSTER.length === 0) {
+    el.innerHTML = `
+      <div class="loading-container">
+        <div class="loading-spinner"></div>
+        <div>Memuat data siswa dari server…</div>
+      </div>
+    `;
+    return;
+  }
+
   const classes = ['Semua', 'P1', 'P2', 'P3', 'P4', 'P5', 'P6'];
 
   el.innerHTML = `
-    <!-- TOMBOL PILIH MODE PENJEMPUTAN -->
     <div class="mode-selection-bar">
       ${mode === 'single' ? `
         <button class="multi-toggle-btn" onclick="switchMode('multi')">
@@ -301,7 +334,6 @@ function renderBody(){
       <input class="search-input" id="search-input" value="${searchQuery.replace(/"/g, '&quot;')}" placeholder="Cari nama anak (depan, tengah, belakang)..." oninput="filterList()">
     </div>
     
-    <!-- FILTER KELAS -->
     <div class="class-filter-wrap">
       ${classes.map(c => `
         <button class="class-filter-btn ${selectedClassFilter === c ? 'active' : ''}" onclick="selectClassFilter('${c}')">
@@ -334,7 +366,6 @@ window.selectClassFilter = function selectClassFilter(c){
   renderBody();
 }
 
-/* ---------------- LOGIKA PENCARIAN FLEKSIBEL & URUT ABJAD ---------------- */
 window.filterList = function filterList(){
   const searchInput = document.getElementById('search-input');
   searchQuery = searchInput ? searchInput.value : '';
@@ -358,7 +389,7 @@ function renderStudentList(list){
   const el = document.getElementById('student-list');
   if(!el) return;
   if(list.length===0){
-    el.innerHTML = `<div class="empty-state">${ROSTER.length===0 ? 'Memuat daftar siswa…' : 'Tidak ada nama siswa yang cocok.'}</div>`;
+    el.innerHTML = `<div class="empty-state">Tidak ada nama siswa yang cocok.</div>`;
     return;
   }
   el.innerHTML = list.map(s=>{
@@ -397,7 +428,6 @@ function renderStudentList(list){
   }).join('');
 }
 
-/* ---------------- ALUR PENJEMPUTAN 1 ANAK (SINGLE) ---------------- */
 window.startSinglePickup = function startSinglePickup(studentId){
   selectedStudentIds = [studentId];
   currentMultiIndex = 0;
@@ -410,7 +440,6 @@ window.startSinglePickup = function startSinglePickup(studentId){
   setTimeout(()=>document.getElementById('picker-name')?.focus(), 50);
 }
 
-/* ---------------- ALUR PENJEMPUTAN >1 ANAK (MULTI) ---------------- */
 window.toggleSelectStudent = function toggleSelectStudent(id){
   const idx = selectedStudentIds.indexOf(id);
   if(idx > -1){
@@ -579,7 +608,6 @@ async function checkAndAdvanceMultiPickup(){
   }
 }
 
-/* ---------------- TAMPILAN ANTREAN REAL-TIME DENGAN STATUS PER ANAK ---------------- */
 let previousStudentStatuses = {};
 
 function showWaitingScreen() {
@@ -658,7 +686,6 @@ function showWaitingScreen() {
   });
 }
 
-/* ---------------- GANTI PIN ---------------- */
 window.openChangePin = function openChangePin(id){
   cpStudent = ROSTER.find(s=>s.id===id);
   cpStage = 'current'; cpPin = ''; cpVals = { current:'', new:'', confirm:'' };
