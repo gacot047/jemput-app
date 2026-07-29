@@ -17,7 +17,7 @@
     <div class="topbar-logo"><img src="logo.png" alt="Logo An Nashir Islamic School"></div>
     <div>
       <div class="topbar-name">Kelola Sekolah</div>
-      <div class="topbar-sub">An Nashir Islamic School (Primary)</div>
+      <div class="topbar-sub">An Nashir Islamic School (SD)</div>
     </div>
   </div>
   <button class="topbar-action" id="logout-btn" style="display:none;" onclick="doLogout()">Keluar</button>
@@ -67,7 +67,7 @@
     </div>
 
     <div class="admin-card">
-      <div class="admin-title">Daftar Seluruh Siswa</div>
+      <div class="admin-title">Daftar Siswa</div>
       <div class="admin-sub">Klik tombol Ubah PIN untuk memperbarui. Perubahan tersimpan otomatis.</div>
       <div id="admin-list"><div class="admin-empty">Memuat…</div></div>
     </div>
@@ -90,7 +90,6 @@ import {
 } from "./firebase-config.js";
 
 let ROSTER = [];
-let unsubRoster = null;
 
 /* ---------------- AUTH ---------------- */
 window.doLogin = async function doLogin(){
@@ -145,14 +144,15 @@ watchAdminSession((user)=>{
     dashWrap.style.display='block';
     logoutBtn.style.display='inline-block';
     document.getElementById('account-email').textContent = user.email;
-    if(!unsubRoster){
-      unsubRoster = listenRoster((list)=>{ ROSTER = list; renderAdminList(); });
-    }
+    // listenRoster sekarang cuma ambil data sekali (bukan listener real-time
+    // lagi, demi menghemat kuota read Firestore), jadi dipanggil ulang setiap
+    // kali berhasil login — tidak perlu lagi disimpan/dihentikan seperti dulu.
+    listenRoster((list)=>{ ROSTER = list; renderAdminList(); });
   } else {
     loginWrap.style.display='block';
     dashWrap.style.display='none';
     logoutBtn.style.display='none';
-    if(unsubRoster){ unsubRoster(); unsubRoster=null; }
+    ROSTER = [];
   }
 });
 
