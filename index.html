@@ -6,6 +6,11 @@
 <meta name="theme-color" content="#0F1C2E">
 <title>Aplikasi Penjemputan — An Nashir Islamic School</title>
 <link rel="icon" href="logo.png">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="logo.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Jemput">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css?v=2.0">
@@ -764,6 +769,13 @@ async function cpAdvance(){
     renderChangePinSheet(`PIN lama salah. ${result.attemptsLeft!=null ? `Sisa percobaan: ${result.attemptsLeft}.` : ''}`);
   }
 }
+</script>
+<script>
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+    });
+  }
 </script>
 </body>
 </html>
